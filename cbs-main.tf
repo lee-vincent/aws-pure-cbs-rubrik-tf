@@ -1,3 +1,5 @@
+# create vpc for rubrik cloud
+
 terraform {
   required_providers {
     aws = {
@@ -15,31 +17,59 @@ terraform {
     # rename executable to terraform-provider-rubrik
     # move to $HOME/.terraform.d/plugins/github.com/rubrikinc/rubrik/1.0.4/linux_amd64/
     # add required_providers rubrik block to .terraform/modules/rubrik-cloud-cluster/main.tf
-    rubrik = {
-      source  = "github.com/rubrikinc/rubrik"
-      version = "= 1.0.4"
+    # rubrik = {
+    #   source  = "github.com/rubrikinc/rubrik"
+    #   version = "= 1.0.4"
+    # }
+    local = {
+      source  = "hashicorp/local"
+      version = "2.2.2"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.1.0"
     }
   }
 }
 
-provider "rubrik" {
-  #   node_ip     = "10.255.41.201"
-  #   username    = "admin"
-  #   password    = "RubrikTFDemo2019"
+# provider "rubrik" {
+#   #   node_ip     = "10.255.41.201"
+#   username = ""
+#   password = ""
+# }
+
+data "local_sensitive_file" "ip" {
+  depends_on = [
+    null_resource.ip_check,
+  ]
+  filename = "${path.module}/ip.txt"
 }
 
+resource "null_resource" "ip_check" {
+  # always check for a new workstation ip
+  triggers = {
+    always_run = "${timestamp()}"
+  }
 
-module "rubrik-cloud-cluster" {
-  source  = "rubrikinc/rubrik-cloud-cluster/aws"
-  version = "1.1.0"
-  # insert the 5 required variables here
-  aws_vpc_security_group_ids = ["sg-0fc82928bd323ed3qq"]
-  aws_subnet_id              = "subnet-0278a40b29e52203a"
-  cluster_name               = "rubrik-cloud-cluster"
-  admin_email                = "build@rubrik.com"
-  dns_search_domain          = ["rubrikdemo.com"]
-  dns_name_servers           = ["10.142.9.3"]
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
+  }
 }
+
+# module "rubrik-cloud-cluster" {
+#   source  = "rubrikinc/rubrik-cloud-cluster/aws"
+#   version = "1.1.0"
+#   # insert the 5 required variables here
+#   aws_vpc_security_group_ids = [aws_security_group.bastion.id]
+#   aws_subnet_id              = aws_subnet.public.id
+#   cluster_name               = "rubrik-cloud-cluster"
+#   admin_email                = "vinnie.lee@ahead.com"
+#   dns_search_domain          = ["ahead.com"]
+#   dns_name_servers           = ["8.8.8.8"]
+# }
+
+
 
 provider "cbs" {
   aws {
@@ -47,9 +77,10 @@ provider "cbs" {
   }
 }
 provider "aws" {
-  region     = var.aws_region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
+  region  = var.aws_region
+  profile = "ahead-root"
+  #   access_key = var.aws_access_key
+  #   secret_key = var.aws_secret_key
   #   access_key = data.vault_generic_secret.aws_auth.data["access_key"]
   #   secret_key = data.vault_generic_secret.aws_auth.data["secret_key"]
 }
@@ -99,6 +130,15 @@ resource "aws_subnet" "public" {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-public-subnet")
   }
 }
+resource "aws_subnet" "workload" {
+  vpc_id            = aws_vpc.cbs_vpc.id
+  cidr_block        = "10.0.6.0/24"
+  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-workload-subnet")
+  }
+}
+
 resource "aws_vpc_endpoint" "s3" {
   vpc_id          = aws_vpc.cbs_vpc.id
   service_name    = format("%s%s%s", "com.amazonaws.", var.aws_region, ".s3")
@@ -188,6 +228,25 @@ resource "aws_security_group" "cbs_iscsi" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-iscsi-securitygroup")
   }
 }
+resource "aws_security_group" "bastion" {
+  name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
+  description = "Allow inbound SSH from my workstation IP"
+  vpc_id      = aws_vpc.cbs_vpc.id
+
+  ingress {
+    description     = "ssh"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    cidr_blocks     = ["${data.local_sensitive_file.ip.content}"]
+    security_groups = [format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")]
+  }
+
+  tags = {
+    Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
+  }
+}
+
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   description = "Management Network Traffic"
@@ -255,9 +314,13 @@ resource "aws_route_table_association" "sys" {
   subnet_id      = aws_subnet.sys.id
   route_table_id = aws_route_table.cbs_routetable.id
 }
+
+#pretty sure the mgmt subnet should not be public
+# create mgmt route table with route to NAT gateway instead?
 resource "aws_route_table_association" "mgmt" {
-  subnet_id      = aws_subnet.mgmt.id
-  route_table_id = aws_route_table.cbs_routetable_public.id
+  subnet_id = aws_subnet.mgmt.id
+  #   route_table_id = aws_route_table.cbs_routetable_public.id
+  route_table_id = aws_route_table.cbs_routetable.id
 }
 resource "aws_route_table" "cbs_routetable_public" {
   vpc_id = aws_vpc.cbs_vpc.id
@@ -467,27 +530,27 @@ data "aws_ami" "amazon_linux2" {
     values = ["x86_64"]
   }
 }
-resource "aws_instance" "linux" {
+resource "aws_instance" "linux_mgmt_instance" {
   ami                    = data.aws_ami.amazon_linux2.image_id
   instance_type          = var.aws_instance_type
-  vpc_security_group_ids = [aws_security_group.cbs_mgmt.id]
-  subnet_id              = aws_subnet.mgmt.id
-  key_name               = var.aws_key_name
+  vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
+  subnet_id              = aws_subnet.public.id
+  key_name               = aws_key_pair.linux_iscsi_workload.key_name
   tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-vm")
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-mgmt-vm")
   }
   user_data                   = var.aws_user_data
   associate_public_ip_address = true
 }
 # Outputs for Pre-Requisites
-output "vm_private_ip" {
-  value = aws_instance.linux.private_ip
+output "linux_mgmt_instance_private_ip" {
+  value = aws_instance.linux_mgmt_instance.private_ip
 }
-output "vm_public_ip" {
-  value = aws_instance.linux.public_ip
+output "linux_mgmt_instance_public_ip" {
+  value = aws_instance.linux_mgmt_instance.public_ip
 }
-output "vm_name" {
-  value = aws_instance.linux.tags.Name
+output "linux_mgmt_instance_name" {
+  value = aws_instance.linux_mgmt_instance.tags.Name
 }
 
 resource "cbs_array_aws" "cbs_aws" {
@@ -502,7 +565,7 @@ resource "cbs_array_aws" "cbs_aws" {
   array_model       = var.purity_instance_type
   license_key       = var.license_key
 
-  pureuser_key_pair_name = var.aws_key_name
+  pureuser_key_pair_name = aws_key_pair.linux_iscsi_workload.key_name
 
   system_subnet      = aws_subnet.sys.id
   replication_subnet = aws_subnet.repl.id
@@ -513,7 +576,7 @@ resource "cbs_array_aws" "cbs_aws" {
   iscsi_security_group       = aws_security_group.cbs_iscsi.id
   management_security_group  = aws_security_group.cbs_mgmt.id
   depends_on = [
-    aws_instance.linux,
+    aws_instance.linux_mgmt_instance,
     aws_internet_gateway.cbs_internet_gateway,
     aws_nat_gateway.cbs_nat_gateway,
     aws_iam_role.cbs_role,
