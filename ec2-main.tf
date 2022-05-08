@@ -1,42 +1,23 @@
 provider "vault" {
-    address = "http://localhost:8200"
-    token = "<unsealtokenfromvault>"
+  address = "http://localhost:8200"
+  token   = "<unsealtokenfromvault>"
 }
 
 data "vault_generic_secret" "aws_auth" {
-    path = "secret/<keyname>"
+  path = "secret/<keyname>"
 }
 
-provider "aws" {
-    region = "us-west-2"
-    access_key = data.vault_generic_secret.aws_auth.data["access_key"]
-    secret_key = data.vault_generic_secret.aws_auth.data["secret_key"]
-}
-
-data "aws_ami" "linux" {
-    owners      = ["amazon"]
-    most_recent = true
-    filter {
-        name   = "name"
-        values = ["amzn2-ami-hvm-2.0*"]
-    }
-    filter {
-        name   = "architecture"
-        values = ["x86_64"]
-    }
-}
-
-resource "aws_instance" "linux" {
-    ami           = data.aws_ami.linux.image_id
-    instance_type = "t2.micro"
-    vpc_security_group_ids = ["sg-id","sg-id2","sg-id3"]
-    get_password_data = true
-    subnet_id = "subnet-id"
-    key_name = "<secretkey>"
-    tags = {
-        Name = "<vmname>"
-    }
-    user_data = <<EOF
+resource "aws_instance" "linux_iscsi_client" {
+  ami                    = data.aws_ami.amazon_linux2.image_id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = ["sg-id", "sg-id2", "sg-id3"]
+  get_password_data      = true
+  subnet_id              = "subnet-id"
+  key_name               = "<secretkey>"
+  tags = {
+    Name = "<vmname>"
+  }
+  user_data = <<EOF
         #!/bin/bash
         yum update -y
         yum -y install iscsi-initiator-utils
@@ -65,11 +46,11 @@ resource "aws_instance" "linux" {
 }
 
 output "public_dns" {
-    value = aws_instance.linux.*.public_dns
+  value = aws_instance.linux.*.public_dns
 }
 output "public_ip" {
-    value = aws_instance.linux.*.public_ip
+  value = aws_instance.linux.*.public_ip
 }
 output "name" {
-    value = aws_instance.linux.*.tags.Name
+  value = aws_instance.linux.*.tags.Name
 }

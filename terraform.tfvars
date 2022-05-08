@@ -2,27 +2,24 @@
 
 
 #AWS Variables
-aws_prefix = "tf-cbs-"
-aws_access_key = "000-000-000"
-aws_secret_key = "000-000-000"
-aws_region = "us-east-1"
-aws_zone = "a"
-aws_ami_owner = ["amazon"]
-aws_ami_name = ["amzn2-ami-hvm-2.0*"]
-aws_ami_architecture = ["x86_64"]
+aws_prefix        = "tf-cbs-"
+aws_access_key    = "000-000-000"
+aws_secret_key    = "000-000-000"
+aws_region        = "us-east-1"
+aws_zone          = "a"
 aws_instance_type = "t2.micro"
-aws_key_name = "aws_keypair"
-aws_user_data = <<EOF
+aws_key_name      = "aws_keypair"
+aws_user_data     = <<EOF
         #!/bin/bash
         echo "hi" > /tmp/user_data.txt
         EOF
 
 #CBS Variables
-template_url            = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214.18cd55bc-47be-45e3-8eaa-2b00c594fa57.template" //6.2.1
-log_sender_domain       = "domain.com"
-alert_recipients        = ["user@domain.com"]
-purity_instance_type    = "V10AR1"
-license_key             = "000-000-000"
+template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214.18cd55bc-47be-45e3-8eaa-2b00c594fa57.template" //6.2.1
+log_sender_domain    = "domain.com"
+alert_recipients     = ["user@domain.com"]
+purity_instance_type = "V10AR1"
+license_key          = "000-000-000"
 
 /* Current Supported Regions for CBS Terraform Deployment
 us-east-1 (N. Virginia) *
