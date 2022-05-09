@@ -17,31 +17,11 @@ aws_user_data = <<EOF
         EOF
 
 #CBS Variables
-# template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214.18cd55bc-47be-45e3-8eaa-2b00c594fa57.template" //6.2.1
-template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214/e0c722f95e6644c6aa323ef49749deb1.template"
+template_url = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214.18cd55bc-47be-45e3-8eaa-2b00c594fa57.template" //6.2.1
+# template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214/e0c722f95e6644c6aa323ef49749deb1.template"
+# template_url           = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214.6b728728-d8fa-4eb7-b92d-22d9aee3684c.template"
 log_sender_domain    = "ahead.com"
 alert_recipients     = ["vinnie.lee@ahead.com"]
 purity_instance_type = "V10AR1"
 license_key          = "CBS-TRIAL-LICENSE"
 # aws_ami_architecture = "x86_64"
-/* Current Supported Regions for CBS Terraform Deployment
-us-east-1 (N. Virginia) *
-us-east-2 (Ohio)
-us-west-1 (N. California)
-us-west-2 (Oregon) * **
-ca-central-1 (Canada Central)
-eu-central-1 (Frankfurt) *
-eu-west-1 (Ireland)
-eu-west-2 (London)*
-ap-south-1 (Mumbai)*
-ap-southeast-1 (Singapore)*
-ap-southeast-2 (Sydney)
-ap-northest-1 (Tokyo)
-ap-northeast-2 (Seoul)
-us-gov-west-1 (GovCloud West)
-
-* These regions are generally supported. However, there are some Availability Zones within these regions that do not have the required c5n.9xlarge and c5n.18xlarge instances for Cloud Block Store. These Availability Zones are different for every customer. Customers can contact AWS Support to find out which Availability Zone does not include support for c5n.9xlarge and c5n.18xlarge instances, and avoid deploying Cloud Block Store in subnets tied to these Availability Zones.
-
-** Cloud Block Store in an ActiveCluster configuration is not supported in Oregon if using with Pure1 Mediator. Customers who want to deploy Cloud Block Store with ActiveCluster in Oregon must use the On-Premises Mediator.
-
-*/

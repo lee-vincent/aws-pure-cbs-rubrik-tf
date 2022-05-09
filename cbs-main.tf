@@ -1,37 +1,17 @@
-# create vpc for rubrik cloud
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 3.0"
-    }
-    cbs = {
-      source  = "PureStorage-OpenConnect/cbs"
-      version = "0.6.0"
-    }
-
-    # manually download rubrik terraform provider from github
-    # https://github.com/rubrikinc/terraform-provider-rubrik/releases
-    # using version 1.0.4
-    # rename executable to terraform-provider-rubrik
-    # move to $HOME/.terraform.d/plugins/github.com/rubrikinc/rubrik/1.0.4/linux_amd64/
-    # add required_providers rubrik block to .terraform/modules/rubrik-cloud-cluster/main.tf
-    # rubrik = {
-    #   source  = "github.com/rubrikinc/rubrik"
-    #   version = "= 1.0.4"
-    # }
-    local = {
-      source  = "hashicorp/local"
-      version = "2.2.2"
-    }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.1.0"
-    }
+# create vpc for rubrik cloud? or subnet?
+provider "cbs" {
+  aws {
+    region = var.aws_region
   }
 }
-
+provider "aws" {
+  region  = var.aws_region
+  profile = "ahead-root"
+  #   access_key = var.aws_access_key
+  #   secret_key = var.aws_secret_key
+  #   access_key = data.vault_generic_secret.aws_auth.data["access_key"]
+  #   secret_key = data.vault_generic_secret.aws_auth.data["secret_key"]
+}
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
 #   username = ""
@@ -44,7 +24,6 @@ data "local_sensitive_file" "ip" {
   ]
   filename = "${path.module}/ip.txt"
 }
-
 resource "null_resource" "ip_check" {
   # always check for a new workstation ip
   triggers = {
@@ -69,21 +48,6 @@ resource "null_resource" "ip_check" {
 #   dns_name_servers           = ["8.8.8.8"]
 # }
 
-
-
-provider "cbs" {
-  aws {
-    region = var.aws_region
-  }
-}
-provider "aws" {
-  region  = var.aws_region
-  profile = "ahead-root"
-  #   access_key = var.aws_access_key
-  #   secret_key = var.aws_secret_key
-  #   access_key = data.vault_generic_secret.aws_auth.data["access_key"]
-  #   secret_key = data.vault_generic_secret.aws_auth.data["secret_key"]
-}
 resource "aws_vpc" "cbs_vpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
@@ -228,24 +192,37 @@ resource "aws_security_group" "cbs_iscsi" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-iscsi-securitygroup")
   }
 }
+
 resource "aws_security_group" "bastion" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
   description = "Allow inbound SSH from my workstation IP"
   vpc_id      = aws_vpc.cbs_vpc.id
-
-  ingress {
-    description     = "ssh"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    cidr_blocks     = ["${data.local_sensitive_file.ip.content}"]
-    security_groups = [format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")]
-  }
-
   tags = {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
   }
 }
+
+resource "aws_security_group_rule" "allow_ssh_bastion" {
+  type              = "ingress"
+  description       = "ssh"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  security_group_id = aws_security_group.bastion.id // Which group to attach it to
+  cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
+
+}
+
+resource "aws_security_group_rule" "allow_bastion_to_workload" {
+  type                     = "ingress"
+  description              = "all"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.bastion.id // Which group to attach it to
+  source_security_group_id = aws_security_group.bastion.id // Which group to specify as source
+}
+
 
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
@@ -314,7 +291,10 @@ resource "aws_route_table_association" "sys" {
   subnet_id      = aws_subnet.sys.id
   route_table_id = aws_route_table.cbs_routetable.id
 }
-
+resource "aws_route_table_association" "workload" {
+  subnet_id      = aws_subnet.workload.id
+  route_table_id = aws_route_table.cbs_routetable.id
+}
 #pretty sure the mgmt subnet should not be public
 # create mgmt route table with route to NAT gateway instead?
 resource "aws_route_table_association" "mgmt" {
@@ -542,16 +522,6 @@ resource "aws_instance" "linux_mgmt_instance" {
   user_data                   = var.aws_user_data
   associate_public_ip_address = true
 }
-# Outputs for Pre-Requisites
-output "linux_mgmt_instance_private_ip" {
-  value = aws_instance.linux_mgmt_instance.private_ip
-}
-output "linux_mgmt_instance_public_ip" {
-  value = aws_instance.linux_mgmt_instance.public_ip
-}
-output "linux_mgmt_instance_name" {
-  value = aws_instance.linux_mgmt_instance.tags.Name
-}
 
 resource "cbs_array_aws" "cbs_aws" {
 
@@ -597,21 +567,4 @@ resource "cbs_array_aws" "cbs_aws" {
     aws_route_table.cbs_routetable,
     aws_eip.cbs_nat_gateway_eip
   ]
-}
-
-#Outputs for CBS
-output "cbs_gui_endpoint" {
-  value = cbs_array_aws.cbs_aws.gui_endpoint
-}
-output "cbs_repl_endpoint_ct0" {
-  value = cbs_array_aws.cbs_aws.replication_endpoint_ct0
-}
-output "cbs_repl_endpoint_ct1" {
-  value = cbs_array_aws.cbs_aws.replication_endpoint_ct1
-}
-output "cbs_iscsi_endpoint_ct0" {
-  value = cbs_array_aws.cbs_aws.iscsi_endpoint_ct0
-}
-output "cbs_iscsi_endpoint_ct1" {
-  value = cbs_array_aws.cbs_aws.iscsi_endpoint_ct1
 }

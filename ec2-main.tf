@@ -49,13 +49,3 @@ resource "aws_instance" "linux_iscsi_workload" {
   #       mount /dev/mapper/$disk /mnt/cbsvol
   #       EOF
 }
-
-output "public_dns" {
-  value = aws_instance.linux_iscsi_workload.*.public_dns
-}
-output "public_ip" {
-  value = aws_instance.linux_iscsi_workload.*.public_ip
-}
-output "name" {
-  value = aws_instance.linux_iscsi_workload.*.tags.Name
-}
