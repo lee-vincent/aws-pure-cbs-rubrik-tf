@@ -1,4 +1,12 @@
 # create vpc for rubrik cloud? or subnet?
+# to deprovisoin Pure CBS
+# remove deletion protection from cfn
+# purearray factory-reset-token create
+# purearray erase --factory-reset-token <token> --eradicate-all-data
+# after above completes, run terraform destroy
+
+
+
 provider "cbs" {
   aws {
     region = var.aws_region
@@ -7,10 +15,6 @@ provider "cbs" {
 provider "aws" {
   region  = var.aws_region
   profile = "ahead-root"
-  #   access_key = var.aws_access_key
-  #   secret_key = var.aws_secret_key
-  #   access_key = data.vault_generic_secret.aws_auth.data["access_key"]
-  #   secret_key = data.vault_generic_secret.aws_auth.data["secret_key"]
 }
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
@@ -18,6 +22,10 @@ provider "aws" {
 #   password = ""
 # }
 
+# this is all a hack to make sure security groups are
+# created to allow my ip address only, while not
+# exposing my ip to all of github
+# must add ip.txt to .gitignore
 data "local_sensitive_file" "ip" {
   depends_on = [
     null_resource.ip_check,
@@ -29,24 +37,26 @@ resource "null_resource" "ip_check" {
   triggers = {
     always_run = "${timestamp()}"
   }
-
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
   }
 }
 
-# module "rubrik-cloud-cluster" {
-#   source  = "rubrikinc/rubrik-cloud-cluster/aws"
-#   version = "1.1.0"
-#   # insert the 5 required variables here
-#   aws_vpc_security_group_ids = [aws_security_group.bastion.id]
-#   aws_subnet_id              = aws_subnet.public.id
-#   cluster_name               = "rubrik-cloud-cluster"
-#   admin_email                = "vinnie.lee@ahead.com"
-#   dns_search_domain          = ["ahead.com"]
-#   dns_name_servers           = ["8.8.8.8"]
-# }
+module "rubrik-cloud-cluster" {
+  # the terraform registry is behind rubrik's github repo
+  # so, sourc directly from this specific commit in the repo
+  source = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
+  # source  = "rubrikinc/rubrik-cloud-cluster/aws"
+  # version = "1.1.0"
+  # insert the 5 required variables here
+  aws_region        = var.aws_region
+  aws_subnet_id     = aws_subnet.rubrik.id
+  cluster_name      = "rubrik-cloud-cluster"
+  admin_email       = "vinnie.lee@ahead.com"
+  dns_search_domain = ["ahead.com"]
+  dns_name_servers  = ["8.8.8.8"]
+}
 
 resource "aws_vpc" "cbs_vpc" {
   cidr_block = "10.0.0.0/16"
@@ -102,7 +112,14 @@ resource "aws_subnet" "workload" {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-workload-subnet")
   }
 }
-
+resource "aws_subnet" "rubrik" {
+  vpc_id            = aws_vpc.cbs_vpc.id
+  cidr_block        = "10.0.7.0/24"
+  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-rubrik-subnet")
+  }
+}
 resource "aws_vpc_endpoint" "s3" {
   vpc_id          = aws_vpc.cbs_vpc.id
   service_name    = format("%s%s%s", "com.amazonaws.", var.aws_region, ".s3")
@@ -190,6 +207,23 @@ resource "aws_security_group" "cbs_iscsi" {
 
   tags = {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-iscsi-securitygroup")
+  }
+}
+resource "aws_security_group" "rubrik" {
+  name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-rubrik-securitygroup")
+  description = "Rubrik Network Traffic"
+  vpc_id      = aws_vpc.cbs_vpc.id
+
+  ingress {
+    description = "all"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-rubrik-securitygroup")
   }
 }
 
@@ -515,7 +549,7 @@ resource "aws_instance" "linux_mgmt_instance" {
   instance_type          = var.aws_instance_type
   vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
   subnet_id              = aws_subnet.public.id
-  key_name               = aws_key_pair.linux_iscsi_workload.key_name
+  key_name               = var.aws_key_name
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-mgmt-vm")
   }
@@ -535,7 +569,7 @@ resource "cbs_array_aws" "cbs_aws" {
   array_model       = var.purity_instance_type
   license_key       = var.license_key
 
-  pureuser_key_pair_name = aws_key_pair.linux_iscsi_workload.key_name
+  pureuser_key_pair_name = var.aws_key_name
 
   system_subnet      = aws_subnet.sys.id
   replication_subnet = aws_subnet.repl.id

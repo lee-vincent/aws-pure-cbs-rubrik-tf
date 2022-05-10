@@ -7,8 +7,8 @@
 #   path = "secret/<keyname>"
 # }
 
-resource "aws_key_pair" "linux_iscsi_workload" {
-  key_name   = "pure-cbs-linux-iscsi-workload"
+resource "aws_key_pair" "pure_cbs_key_pair" {
+  key_name   = var.aws_key_name
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDp1v3gYYtj55rd6wBvNtgw9SOK3JFyzkLOocM8Wpir8vl7IMbl9UVGdWVKqLA5D17i6sO5rLYKCUYNSs5nz+El9nIyw1/g4Z33mZsFNiQrcZSQQUIp5id5VFYo0OUoqYbXEHEHxaOrhz7SOfOXfHHVwj9xy0TixwQuLRrJMy6ZOJ9W3cxxI0hnSGh1ahFy4uRcV8LTHrDEOrZGZWT3kbFx8nkZQMx0t5A3DYC0++njCO8IZDo/MCcjRg9N2vEwn4Ng/IDMNsoQbU08+2XK+2x87iIP265A7RMJcbscUdyWiw8LWkBhV3wbKHSbRk45Vg4BxNnXANcZaVJNVlUqewO5"
 }
 
@@ -18,7 +18,7 @@ resource "aws_instance" "linux_iscsi_workload" {
   vpc_security_group_ids = [aws_security_group.cbs_iscsi.id, aws_security_group.bastion.id]
   get_password_data      = false
   subnet_id              = aws_subnet.workload.id
-  key_name               = aws_key_pair.linux_iscsi_workload.key_name
+  key_name               = var.aws_key_name
   tags = {
     Name = "iscsi_workload"
   }
