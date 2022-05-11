@@ -26,7 +26,6 @@ output "cbs_iscsi_endpoint_ct1" {
   value = cbs_array_aws.cbs_aws.iscsi_endpoint_ct1
 }
 
-
 #Outputs for linux workload instance (iscsi initiator)
 output "public_dns" {
   value = aws_instance.linux_iscsi_workload.*.public_dns

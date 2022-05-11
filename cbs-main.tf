@@ -14,7 +14,7 @@ provider "cbs" {
 }
 provider "aws" {
   region  = var.aws_region
-  profile = "ahead-root"
+  profile = "bilh"
 }
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
@@ -53,9 +53,10 @@ module "rubrik-cloud-cluster" {
   aws_region        = var.aws_region
   aws_subnet_id     = aws_subnet.rubrik.id
   cluster_name      = "rubrik-cloud-cluster"
-  admin_email       = "vinnie.lee@ahead.com"
-  dns_search_domain = ["ahead.com"]
+  admin_email       = var.alert_recipients
+  dns_search_domain = [""]
   dns_name_servers  = ["8.8.8.8"]
+  aws_public_key    = var.aws_public_key
 }
 
 resource "aws_vpc" "cbs_vpc" {

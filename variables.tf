@@ -4,6 +4,10 @@ variable "aws_instance_type" {
 variable "aws_key_name" {
   type = string
 }
+variable "aws_public_key" {
+  type      = string
+  sensitive = true
+}
 variable "aws_user_data" {
   type = string
 }

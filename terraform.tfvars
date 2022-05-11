@@ -16,8 +16,9 @@ aws_user_data = <<EOF
 
 #CBS Variables
 template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214/e0c722f95e6644c6aa323ef49749deb1.template"
-log_sender_domain    = "vinnielee.io"
-alert_recipients     = ["vinnie@vinnielee.io"]
+log_sender_domain    = "ahead.com"
+alert_recipients     = ["vinnie.lee@ahead.com"]
 purity_instance_type = "V10AR1"
 license_key          = "CBS-TRIAL-LICENSE"
+# aws_public_key   set witht the value of TF_VAR_aws_public_key
 # aws_ami_architecture = "x86_64"

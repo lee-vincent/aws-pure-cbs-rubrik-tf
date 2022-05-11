@@ -9,7 +9,7 @@
 
 resource "aws_key_pair" "pure_cbs_key_pair" {
   key_name   = var.aws_key_name
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDp1v3gYYtj55rd6wBvNtgw9SOK3JFyzkLOocM8Wpir8vl7IMbl9UVGdWVKqLA5D17i6sO5rLYKCUYNSs5nz+El9nIyw1/g4Z33mZsFNiQrcZSQQUIp5id5VFYo0OUoqYbXEHEHxaOrhz7SOfOXfHHVwj9xy0TixwQuLRrJMy6ZOJ9W3cxxI0hnSGh1ahFy4uRcV8LTHrDEOrZGZWT3kbFx8nkZQMx0t5A3DYC0++njCO8IZDo/MCcjRg9N2vEwn4Ng/IDMNsoQbU08+2XK+2x87iIP265A7RMJcbscUdyWiw8LWkBhV3wbKHSbRk45Vg4BxNnXANcZaVJNVlUqewO5"
+  public_key = var.aws_public_key
 }
 
 resource "aws_instance" "linux_iscsi_workload" {
