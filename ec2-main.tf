@@ -13,6 +13,9 @@ resource "aws_key_pair" "pure_cbs_key_pair" {
 }
 
 resource "aws_instance" "linux_iscsi_workload" {
+  depends_on = [
+    cbs_array_aws.cbs_aws
+  ]
   ami                    = data.aws_ami.amazon_linux2.image_id
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.cbs_iscsi.id, aws_security_group.bastion.id]

@@ -43,21 +43,21 @@ resource "null_resource" "ip_check" {
   }
 }
 
-module "rubrik-cloud-cluster" {
-  # the terraform registry is behind rubrik's github repo
-  # so, sourc directly from this specific commit in the repo
-  source = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
-  # source  = "rubrikinc/rubrik-cloud-cluster/aws"
-  # version = "1.1.0"
-  # insert the 5 required variables here
-  aws_region        = var.aws_region
-  aws_subnet_id     = aws_subnet.rubrik.id
-  cluster_name      = "rubrik-cloud-cluster"
-  admin_email       = var.alert_recipients
-  dns_search_domain = [""]
-  dns_name_servers  = ["8.8.8.8"]
-  aws_public_key    = var.aws_public_key
-}
+# module "rubrik-cloud-cluster" {
+#   # the terraform registry is behind rubrik's github repo
+#   # so, sourc directly from this specific commit in the repo
+#   source = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
+#   # source  = "rubrikinc/rubrik-cloud-cluster/aws"
+#   # version = "1.1.0"
+#   # insert the 5 required variables here
+#   aws_region        = var.aws_region
+#   aws_subnet_id     = aws_subnet.rubrik.id
+#   cluster_name      = "rubrik-cloud-cluster"
+#   admin_email       = var.alert_recipients
+#   dns_search_domain = [""]
+#   dns_name_servers  = ["8.8.8.8"]
+#   aws_public_key    = var.aws_public_key
+# }
 
 resource "aws_vpc" "cbs_vpc" {
   cidr_block = "10.0.0.0/16"
