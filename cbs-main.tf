@@ -45,7 +45,8 @@ resource "null_resource" "ip_check" {
 
 module "rubrik-cloud-cluster" {
   depends_on = [
-    cbs_array_aws.cbs_aws
+    cbs_array_aws.cbs_aws,
+    aws_instance.linux_iscsi_workload
   ]
   # the terraform registry is behind rubrik's github repo
   # so, sourc directly from this specific commit in the repo
