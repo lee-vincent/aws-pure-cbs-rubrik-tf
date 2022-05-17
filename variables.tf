@@ -12,6 +12,10 @@ variable "aws_rubrik_public_key" {
   type      = string
   sensitive = true
 }
+variable "cbs_mgmt_key" {
+  type      = string
+  sensitive = false
+}
 variable "aws_user_data" {
   type = string
 }

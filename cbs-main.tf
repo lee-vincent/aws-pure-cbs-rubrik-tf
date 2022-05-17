@@ -14,7 +14,7 @@ provider "cbs" {
 }
 provider "aws" {
   region  = var.aws_region
-  profile = "bilh"
+  profile = "default"
 }
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
@@ -34,9 +34,9 @@ data "local_sensitive_file" "ip" {
 }
 resource "null_resource" "ip_check" {
   # always check for a new workstation ip
-  triggers = {
-    always_run = "${timestamp()}"
-  }
+  # triggers = {
+  #   always_run = "${timestamp()}"
+  # }
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
@@ -44,10 +44,6 @@ resource "null_resource" "ip_check" {
 }
 
 module "rubrik-cloud-cluster" {
-  depends_on = [
-    cbs_array_aws.cbs_aws,
-    aws_instance.linux_iscsi_workload
-  ]
   # the terraform registry is behind rubrik's github repo
   # so, sourc directly from this specific commit in the repo
   source = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
@@ -58,6 +54,18 @@ module "rubrik-cloud-cluster" {
   dns_search_domain = [""]
   dns_name_servers  = ["8.8.8.8"]
   aws_public_key    = var.aws_rubrik_public_key
+}
+
+resource "aws_subnet" "rubrik" {
+    depends_on = [
+    aws_instance.linux_iscsi_workload
+  ]
+  vpc_id            = aws_vpc.cbs_vpc.id
+  cidr_block        = "10.0.7.0/24"
+  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-rubrik-subnet")
+  }
 }
 
 resource "aws_vpc" "cbs_vpc" {
@@ -112,14 +120,6 @@ resource "aws_subnet" "workload" {
   availability_zone = format("%s%s", var.aws_region, var.aws_zone)
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-workload-subnet")
-  }
-}
-resource "aws_subnet" "rubrik" {
-  vpc_id            = aws_vpc.cbs_vpc.id
-  cidr_block        = "10.0.7.0/24"
-  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
-  tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-rubrik-subnet")
   }
 }
 resource "aws_vpc_endpoint" "s3" {
@@ -554,7 +554,13 @@ resource "aws_instance" "linux_mgmt_instance" {
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-mgmt-vm")
   }
-  user_data                   = var.aws_user_data
+  user_data              = <<EOF
+#!/bin/bash
+touch /home/ec2-user/.ssh/cbs-mgmt-key
+chown ec2-user:ec2-user /home/ec2-user/.ssh/cbs-mgmt-key
+echo "${var.cbs_mgmt_key}" > /home/ec2-user/.ssh/cbs-mgmt-key
+chmod 0400 /home/ec2-user/.ssh/cbs-mgmt-key
+EOF
   associate_public_ip_address = true
 }
 
