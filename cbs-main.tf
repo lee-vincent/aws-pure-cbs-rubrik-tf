@@ -4,7 +4,7 @@
 # purearray factory-reset-token create
 # purearray erase --factory-reset-token <token> --eradicate-all-data
 # after above completes, run terraform destroy
-
+# need to get private ips of rubrik nodes for bootstrap
 
 
 provider "cbs" {
@@ -14,7 +14,26 @@ provider "cbs" {
 }
 provider "aws" {
   region  = var.aws_region
-  profile = "default"
+  profile = var.profile
+}
+
+# Point the provider to the Polaris service account to use.
+provider "polaris" {
+  credentials = var.polaris_credentials
+}
+
+# Add the AWS account to Polaris. Access key and secret key are read from
+# ~/.aws/credentials. The default region is read from ~/.aws/config. Polaris
+# will authenticate to AWS using an IAM role setup in a CloudFormation stack.
+resource "polaris_aws_account" "bilh" {
+  profile     = var.profile
+  permissions = "update"
+
+  cloud_native_protection {
+    regions = [
+      var.aws_region
+    ]
+  }
 }
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
@@ -46,18 +65,19 @@ resource "null_resource" "ip_check" {
 module "rubrik-cloud-cluster" {
   # the terraform registry is behind rubrik's github repo
   # so, sourc directly from this specific commit in the repo
-  source = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
-  aws_region        = var.aws_region
-  aws_subnet_id     = aws_subnet.rubrik.id
-  cluster_name      = "rubrik-cloud-cluster"
-  admin_email       = var.alert_recipients
-  dns_search_domain = [""]
-  dns_name_servers  = ["8.8.8.8"]
-  aws_public_key    = var.aws_rubrik_public_key
+  source              = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
+  aws_region          = var.aws_region
+  aws_subnet_id       = aws_subnet.rubrik.id
+  cluster_name        = "rubrik-cloud-cluster"
+  mgmt_security_group = aws_security_group.bastion.id
+  admin_email         = var.alert_recipients
+  dns_search_domain   = [""]
+  dns_name_servers    = ["8.8.8.8"]
+  aws_public_key      = var.aws_rubrik_public_key
 }
 
 resource "aws_subnet" "rubrik" {
-    depends_on = [
+  depends_on = [
     aws_instance.linux_iscsi_workload
   ]
   vpc_id            = aws_vpc.cbs_vpc.id
@@ -257,8 +277,33 @@ resource "aws_security_group_rule" "allow_bastion_to_workload" {
   security_group_id        = aws_security_group.bastion.id // Which group to attach it to
   source_security_group_id = aws_security_group.bastion.id // Which group to specify as source
 }
-
-
+resource "aws_security_group_rule" "allow_outbound_bastion_to_workload" {
+  type              = "egress"
+  description       = "all"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.bastion.id // Which group to attach it to
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+resource "aws_security_group_rule" "allow_443_ping_bastion" {
+  type              = "ingress"
+  description       = "443"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.bastion.id // Which group to attach it to
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+resource "aws_security_group_rule" "allow_inbound_ping_bastion" {
+  type              = "ingress"
+  description       = "ping"
+  from_port         = 1
+  to_port           = 1
+  protocol          = "icmp"
+  security_group_id = aws_security_group.bastion.id // Which group to attach it to
+  cidr_blocks       = ["0.0.0.0/0"]
+}
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   description = "Management Network Traffic"
@@ -353,6 +398,10 @@ resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.cbs_routetable_public.id
 }
+resource "aws_route_table_association" "public_rubrik_cc" {
+  subnet_id      = aws_subnet.rubrik.id
+  route_table_id = aws_route_table.cbs_routetable_main.id
+}
 resource "aws_route_table" "cbs_routetable_main" {
   vpc_id = aws_vpc.cbs_vpc.id
 
@@ -369,6 +418,20 @@ resource "aws_main_route_table_association" "main" {
   vpc_id         = aws_vpc.cbs_vpc.id
   route_table_id = aws_route_table.cbs_routetable_main.id
 }
+
+resource "aws_iam_service_linked_role" "autoscaling_dynamodb_role" {
+  aws_service_name = "dynamodb.application-autoscaling.amazonaws.com"
+}
+
+# data "aws_iam_policy" "autoscaling_dynamodb_role_policy" {
+#   name = "AWSApplicationAutoscalingDynamoDBTablePolicy"
+# }
+
+# resource "aws_iam_role_policy_attachment" "autoscaling_dynamodb_role_policy_attachment" {
+#   role       = aws_iam_service_linked_role.autoscaling_dynamodb_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSApplicationAutoscalingDynamoDBTablePolicy"
+# }
+
 resource "aws_iam_role" "cbs_role" {
   name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs-iamrole")
 
@@ -525,8 +588,7 @@ resource "aws_iam_role_policy" "cbs_role_policy" {
           "s3:PutBucketPolicy",
           "s3:PutBucketTagging",
           "s3:PutBucketVersioning",
-          "sts:assumerole"
-        ],
+        "sts:assumerole"],
         "Resource" : "*"
       }
     ]
@@ -545,6 +607,7 @@ data "aws_ami" "amazon_linux2" {
     values = ["x86_64"]
   }
 }
+
 resource "aws_instance" "linux_mgmt_instance" {
   ami                    = data.aws_ami.amazon_linux2.image_id
   instance_type          = var.aws_instance_type
@@ -554,7 +617,7 @@ resource "aws_instance" "linux_mgmt_instance" {
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-mgmt-vm")
   }
-  user_data              = <<EOF
+  user_data                   = <<EOF
 #!/bin/bash
 touch /home/ec2-user/.ssh/cbs-mgmt-key
 chown ec2-user:ec2-user /home/ec2-user/.ssh/cbs-mgmt-key
@@ -562,6 +625,16 @@ echo "${var.cbs_mgmt_key}" > /home/ec2-user/.ssh/cbs-mgmt-key
 chmod 0400 /home/ec2-user/.ssh/cbs-mgmt-key
 EOF
   associate_public_ip_address = true
+}
+resource "aws_instance" "windows_mgmt_instance" {
+  ami                    = var.windows_ami
+  instance_type          = var.aws_instance_type
+  vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
+  subnet_id              = aws_subnet.public.id
+  key_name               = var.aws_key_name
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-win-mgmt-vm")
+  }
 }
 
 resource "cbs_array_aws" "cbs_aws" {

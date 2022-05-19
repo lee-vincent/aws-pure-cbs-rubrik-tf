@@ -13,7 +13,7 @@ aws_user_data = <<EOF
         #!/bin/bash
         echo "hi" > /tmp/user_data.txt
         EOF
-
+profile       = "bilh"
 #CBS Variables
 template_url         = "https://s3.amazonaws.com/awsmp-fulfillment-cf-templates-prod/4ea2905b-7939-4ee0-a521-d5c2fcb41214/e0c722f95e6644c6aa323ef49749deb1.template"
 log_sender_domain    = "ahead.com"

@@ -12,6 +12,17 @@ variable "aws_rubrik_public_key" {
   type      = string
   sensitive = true
 }
+variable "profile" {
+  type        = string
+  description = "AWS profile."
+}
+variable "polaris_credentials" {
+  type        = string
+  description = "Account name or path to the Polaris service account file."
+}
+variable "windows_ami" {
+  default = "ami-033594f8862b03bb2"
+}
 variable "cbs_mgmt_key" {
   type      = string
   sensitive = false
