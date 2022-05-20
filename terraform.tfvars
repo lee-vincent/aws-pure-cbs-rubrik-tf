@@ -20,5 +20,6 @@ log_sender_domain    = "ahead.com"
 alert_recipients     = ["vinnie.lee@ahead.com"]
 purity_instance_type = "V10AR1"
 license_key          = "CBS-TRIAL-LICENSE"
+create_cbs_array     = true
 # aws_public_key   set witht the value of TF_VAR_aws_public_key
 # aws_ami_architecture = "x86_64"

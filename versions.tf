@@ -16,10 +16,10 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.1.0"
     }
-    polaris = {
-      source  = "rubrikinc/polaris"
-      version = "0.3.12"
-    }
+    # polaris = {
+    #   source  = "rubrikinc/polaris"
+    #   version = "0.3.12"
+    # }
     # manually download rubrik terraform provider from github
     # https://github.com/rubrikinc/terraform-provider-rubrik/releases
     # using version 1.0.4

@@ -12,6 +12,10 @@ variable "aws_rubrik_public_key" {
   type      = string
   sensitive = true
 }
+variable "create_cbs_array" {
+  type    = bool
+  default = true
+}
 variable "profile" {
   type        = string
   description = "AWS profile."

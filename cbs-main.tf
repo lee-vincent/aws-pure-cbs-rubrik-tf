@@ -6,7 +6,7 @@
 # after above completes, run terraform destroy
 # need to get private ips of rubrik nodes for bootstrap
 
-
+#add rdp rule for windows mgmt vm
 provider "cbs" {
   aws {
     region = var.aws_region
@@ -18,23 +18,23 @@ provider "aws" {
 }
 
 # Point the provider to the Polaris service account to use.
-provider "polaris" {
-  credentials = var.polaris_credentials
-}
+# provider "polaris" {
+#   credentials = var.polaris_credentials
+# }
 
 # Add the AWS account to Polaris. Access key and secret key are read from
 # ~/.aws/credentials. The default region is read from ~/.aws/config. Polaris
 # will authenticate to AWS using an IAM role setup in a CloudFormation stack.
-resource "polaris_aws_account" "bilh" {
-  profile     = var.profile
-  permissions = "update"
+# resource "polaris_aws_account" "bilh" {
+#   profile     = var.profile
+#   permissions = "update"
 
-  cloud_native_protection {
-    regions = [
-      var.aws_region
-    ]
-  }
-}
+#   cloud_native_protection {
+#     regions = [
+#       var.aws_region
+#     ]
+#   }
+# }
 # provider "rubrik" {
 #   #   node_ip     = "10.255.41.201"
 #   username = ""
@@ -77,9 +77,6 @@ module "rubrik-cloud-cluster" {
 }
 
 resource "aws_subnet" "rubrik" {
-  depends_on = [
-    aws_instance.linux_iscsi_workload
-  ]
   vpc_id            = aws_vpc.cbs_vpc.id
   cidr_block        = "10.0.7.0/24"
   availability_zone = format("%s%s", var.aws_region, var.aws_zone)
@@ -267,7 +264,15 @@ resource "aws_security_group_rule" "allow_ssh_bastion" {
   security_group_id = aws_security_group.bastion.id // Which group to attach it to
   cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
 }
-
+resource "aws_security_group_rule" "allow_rdp_windows" {
+  type              = "ingress"
+  description       = "rdp"
+  from_port         = 3389
+  to_port           = 3389
+  protocol          = "tcp"
+  security_group_id = aws_security_group.bastion.id // Which group to attach it to
+  cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
+}
 resource "aws_security_group_rule" "allow_bastion_to_workload" {
   type                     = "ingress"
   description              = "all"
@@ -609,8 +614,14 @@ data "aws_ami" "amazon_linux2" {
 }
 
 resource "aws_instance" "linux_mgmt_instance" {
+  # depends_on = [
+  #   cbs_array_aws.cbs_aws,
+  #   module.rubrik-cloud-cluster
+#   echo -e "\nexport PURE="${cbs_array_aws.cbs_aws.management_endpoint}"" >> /home/ec2-user/.bashrc
+# echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
+  # ]
   ami                    = data.aws_ami.amazon_linux2.image_id
-  instance_type          = var.aws_instance_type
+  instance_type          = "t3.large"
   vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
   subnet_id              = aws_subnet.public.id
   key_name               = var.aws_key_name
@@ -623,15 +634,17 @@ touch /home/ec2-user/.ssh/cbs-mgmt-key
 chown ec2-user:ec2-user /home/ec2-user/.ssh/cbs-mgmt-key
 echo "${var.cbs_mgmt_key}" > /home/ec2-user/.ssh/cbs-mgmt-key
 chmod 0400 /home/ec2-user/.ssh/cbs-mgmt-key
+
 EOF
   associate_public_ip_address = true
 }
 resource "aws_instance" "windows_mgmt_instance" {
-  ami                    = var.windows_ami
-  instance_type          = var.aws_instance_type
-  vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
-  subnet_id              = aws_subnet.public.id
-  key_name               = var.aws_key_name
+  ami                         = var.windows_ami
+  associate_public_ip_address = true
+  instance_type               = "t3.large"
+  vpc_security_group_ids      = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
+  subnet_id                   = aws_subnet.public.id
+  key_name                    = var.aws_key_name
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-win-mgmt-vm")
   }
@@ -660,7 +673,6 @@ resource "cbs_array_aws" "cbs_aws" {
   iscsi_security_group       = aws_security_group.cbs_iscsi.id
   management_security_group  = aws_security_group.cbs_mgmt.id
   depends_on = [
-    aws_instance.linux_mgmt_instance,
     aws_internet_gateway.cbs_internet_gateway,
     aws_nat_gateway.cbs_nat_gateway,
     aws_iam_role.cbs_role,
