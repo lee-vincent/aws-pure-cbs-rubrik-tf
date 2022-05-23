@@ -6,15 +6,18 @@
 # after above completes, run terraform destroy
 # need to get private ips of rubrik nodes for bootstrap
 
-#add rdp rule for windows mgmt vm
-provider "cbs" {
-  aws {
-    region = var.aws_region
-  }
-}
+
+## delete mgmt sg from bastion
+
+
+# provider "cbs" {
+#   aws {
+#     region = var.aws_region
+#   }
+# }
 provider "aws" {
   region  = var.aws_region
-  profile = var.profile
+  profile = var.aws_profile
 }
 
 # Point the provider to the Polaris service account to use.
@@ -22,11 +25,13 @@ provider "aws" {
 #   credentials = var.polaris_credentials
 # }
 
+#there was an error with the polaris permission cfn template
+
 # Add the AWS account to Polaris. Access key and secret key are read from
 # ~/.aws/credentials. The default region is read from ~/.aws/config. Polaris
 # will authenticate to AWS using an IAM role setup in a CloudFormation stack.
 # resource "polaris_aws_account" "bilh" {
-#   profile     = var.profile
+#   profile     = var.aws_profile
 #   permissions = "update"
 
 #   cloud_native_protection {
@@ -53,9 +58,9 @@ data "local_sensitive_file" "ip" {
 }
 resource "null_resource" "ip_check" {
   # always check for a new workstation ip
-  # triggers = {
-  #   always_run = "${timestamp()}"
-  # }
+  triggers = {
+    always_run = "${timestamp()}"
+  }
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
@@ -63,26 +68,11 @@ resource "null_resource" "ip_check" {
 }
 
 module "rubrik-cloud-cluster" {
-  # the terraform registry is behind rubrik's github repo
-  # so, sourc directly from this specific commit in the repo
-  source              = "git::https://github.com/rubrikinc/terraform-aws-rubrik-cloud-cluster.git?ref=f9f246e30dbe7541591ec3e70eb1fb765a4d4fbd"
-  aws_region          = var.aws_region
-  aws_subnet_id       = aws_subnet.rubrik.id
-  cluster_name        = "rubrik-cloud-cluster"
-  mgmt_security_group = aws_security_group.bastion.id
-  admin_email         = var.alert_recipients
-  dns_search_domain   = [""]
-  dns_name_servers    = ["8.8.8.8"]
-  aws_public_key      = var.aws_rubrik_public_key
-}
-
-resource "aws_subnet" "rubrik" {
-  vpc_id            = aws_vpc.cbs_vpc.id
-  cidr_block        = "10.0.7.0/24"
-  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
-  tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-rubrik-subnet")
-  }
+  source                                   = "git::https://github.com/lee-vincent/terraform-aws-rubrik-cloud-cluster-es.git"
+  aws_region                               = var.aws_region
+  aws_subnet_id                            = aws_subnet.rubrik.id
+  security_group_id_inbound_ssh_https_mgmt = aws_security_group.bastion.id
+  aws_public_key_name                      = var.bilh_aws_demo_master_key_name
 }
 
 resource "aws_vpc" "cbs_vpc" {
@@ -137,6 +127,14 @@ resource "aws_subnet" "workload" {
   availability_zone = format("%s%s", var.aws_region, var.aws_zone)
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-workload-subnet")
+  }
+}
+resource "aws_subnet" "rubrik" {
+  vpc_id            = aws_vpc.cbs_vpc.id
+  cidr_block        = "10.0.7.0/24"
+  availability_zone = format("%s%s", var.aws_region, var.aws_zone)
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-rubrik-subnet")
   }
 }
 resource "aws_vpc_endpoint" "s3" {
@@ -228,23 +226,6 @@ resource "aws_security_group" "cbs_iscsi" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-iscsi-securitygroup")
   }
 }
-resource "aws_security_group" "rubrik" {
-  name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-rubrik-securitygroup")
-  description = "Rubrik Network Traffic"
-  vpc_id      = aws_vpc.cbs_vpc.id
-
-  ingress {
-    description = "all"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-rubrik-securitygroup")
-  }
-}
 
 resource "aws_security_group" "bastion" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
@@ -253,62 +234,76 @@ resource "aws_security_group" "bastion" {
   tags = {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
   }
+  ingress {
+    description = "ssh from workstation or this security group"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
+    self        = true
+  }
+  ingress {
+    description = "all inbound traffic between this sg"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
+  egress {
+    description = "all outbound traffic between this sg"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
 }
 
-resource "aws_security_group_rule" "allow_ssh_bastion" {
-  type              = "ingress"
-  description       = "ssh"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  security_group_id = aws_security_group.bastion.id // Which group to attach it to
-  cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
-}
-resource "aws_security_group_rule" "allow_rdp_windows" {
-  type              = "ingress"
-  description       = "rdp"
-  from_port         = 3389
-  to_port           = 3389
-  protocol          = "tcp"
-  security_group_id = aws_security_group.bastion.id // Which group to attach it to
-  cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
-}
-resource "aws_security_group_rule" "allow_bastion_to_workload" {
-  type                     = "ingress"
-  description              = "all"
-  from_port                = 0
-  to_port                  = 0
-  protocol                 = "-1"
-  security_group_id        = aws_security_group.bastion.id // Which group to attach it to
-  source_security_group_id = aws_security_group.bastion.id // Which group to specify as source
-}
-resource "aws_security_group_rule" "allow_outbound_bastion_to_workload" {
-  type              = "egress"
-  description       = "all"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  security_group_id = aws_security_group.bastion.id // Which group to attach it to
-  cidr_blocks       = ["0.0.0.0/0"]
-}
-resource "aws_security_group_rule" "allow_443_ping_bastion" {
-  type              = "ingress"
-  description       = "443"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.bastion.id // Which group to attach it to
-  cidr_blocks       = ["0.0.0.0/0"]
-}
-resource "aws_security_group_rule" "allow_inbound_ping_bastion" {
-  type              = "ingress"
-  description       = "ping"
-  from_port         = 1
-  to_port           = 1
-  protocol          = "icmp"
-  security_group_id = aws_security_group.bastion.id // Which group to attach it to
-  cidr_blocks       = ["0.0.0.0/0"]
-}
+# resource "aws_security_group_rule" "allow_ssh_bastion" {
+#   type              = "ingress"
+#   description       = "ssh"
+#   from_port         = 22
+#   to_port           = 22
+#   protocol          = "tcp"
+#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
+#   self = true
+#   cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
+# }
+# resource "aws_security_group_rule" "allow_bastion_to_workload" {
+#   type                     = "ingress"
+#   description              = "all"
+#   from_port                = 0
+#   to_port                  = 0
+#   protocol                 = "-1"
+#   security_group_id        = aws_security_group.bastion.id // Which group to attach it to
+#   source_security_group_id = aws_security_group.bastion.id // Which group to specify as source
+# }
+# resource "aws_security_group_rule" "allow_outbound_bastion_to_workload" {
+#   type              = "egress"
+#   description       = "all"
+#   from_port         = 0
+#   to_port           = 0
+#   protocol          = "-1"
+#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
+#   cidr_blocks       = ["0.0.0.0/0"]
+# }
+# resource "aws_security_group_rule" "allow_443_ping_bastion" {
+#   type              = "ingress"
+#   description       = "443"
+#   from_port         = 443
+#   to_port           = 443
+#   protocol          = "tcp"
+#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
+#   cidr_blocks       = ["0.0.0.0/0"]
+# }
+# resource "aws_security_group_rule" "allow_inbound_ping_bastion" {
+#   type              = "ingress"
+#   description       = "ping"
+#   from_port         = 1
+#   to_port           = 1
+#   protocol          = "icmp"
+#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
+#   cidr_blocks       = ["0.0.0.0/0"]
+# }
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   description = "Management Network Traffic"
@@ -360,6 +355,26 @@ resource "aws_security_group" "cbs_mgmt" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   }
 }
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.cbs_routetable_public.id
+}
+resource "aws_route_table_association" "rubrik" {
+  subnet_id      = aws_subnet.rubrik.id
+  route_table_id = aws_route_table.cbs_routetable.id
+}
+resource "aws_route_table_association" "sys" {
+  subnet_id      = aws_subnet.sys.id
+  route_table_id = aws_route_table.cbs_routetable.id
+}
+resource "aws_route_table_association" "workload" {
+  subnet_id      = aws_subnet.workload.id
+  route_table_id = aws_route_table.cbs_routetable.id
+}
+resource "aws_route_table_association" "mgmt" {
+  subnet_id      = aws_subnet.mgmt.id
+  route_table_id = aws_route_table.cbs_routetable.id
+}
 resource "aws_route_table" "cbs_routetable" {
   vpc_id = aws_vpc.cbs_vpc.id
 
@@ -371,21 +386,6 @@ resource "aws_route_table" "cbs_routetable" {
   tags = {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-routetable")
   }
-}
-resource "aws_route_table_association" "sys" {
-  subnet_id      = aws_subnet.sys.id
-  route_table_id = aws_route_table.cbs_routetable.id
-}
-resource "aws_route_table_association" "workload" {
-  subnet_id      = aws_subnet.workload.id
-  route_table_id = aws_route_table.cbs_routetable.id
-}
-#pretty sure the mgmt subnet should not be public
-# create mgmt route table with route to NAT gateway instead?
-resource "aws_route_table_association" "mgmt" {
-  subnet_id = aws_subnet.mgmt.id
-  #   route_table_id = aws_route_table.cbs_routetable_public.id
-  route_table_id = aws_route_table.cbs_routetable.id
 }
 resource "aws_route_table" "cbs_routetable_public" {
   vpc_id = aws_vpc.cbs_vpc.id
@@ -399,14 +399,7 @@ resource "aws_route_table" "cbs_routetable_public" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-routetable-public")
   }
 }
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.cbs_routetable_public.id
-}
-resource "aws_route_table_association" "public_rubrik_cc" {
-  subnet_id      = aws_subnet.rubrik.id
-  route_table_id = aws_route_table.cbs_routetable_main.id
-}
+
 resource "aws_route_table" "cbs_routetable_main" {
   vpc_id = aws_vpc.cbs_vpc.id
 
@@ -613,84 +606,73 @@ data "aws_ami" "amazon_linux2" {
   }
 }
 
-resource "aws_instance" "linux_mgmt_instance" {
+resource "aws_instance" "bastion_instance" {
   # depends_on = [
   #   cbs_array_aws.cbs_aws,
   #   module.rubrik-cloud-cluster
-#   echo -e "\nexport PURE="${cbs_array_aws.cbs_aws.management_endpoint}"" >> /home/ec2-user/.bashrc
-# echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
+  #   echo -e "\nexport PURE="${cbs_array_aws.cbs_aws.management_endpoint}"" >> /home/ec2-user/.bashrc
+  # echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
   # ]
   ami                    = data.aws_ami.amazon_linux2.image_id
-  instance_type          = "t3.large"
-  vpc_security_group_ids = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
+  instance_type          = var.aws_bastion_instance_type
+  vpc_security_group_ids = [aws_security_group.bastion.id]
   subnet_id              = aws_subnet.public.id
-  key_name               = var.aws_key_name
+  key_name               = var.bilh_aws_demo_master_key_name
   tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-mgmt-vm")
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-bastion")
   }
   user_data                   = <<EOF
 #!/bin/bash
 touch /home/ec2-user/.ssh/cbs-mgmt-key
-chown ec2-user:ec2-user /home/ec2-user/.ssh/cbs-mgmt-key
-echo "${var.cbs_mgmt_key}" > /home/ec2-user/.ssh/cbs-mgmt-key
-chmod 0400 /home/ec2-user/.ssh/cbs-mgmt-key
+chown ec2-user:ec2-user /home/ec2-user/.ssh/bilh_aws_demo_master_key
+echo "${var.bilh_aws_demo_master_key}" > /home/ec2-user/.ssh/bilh_aws_demo_master_key
+chmod 0400 /home/ec2-user/.ssh/bilh_aws_demo_master_key
 
 EOF
   associate_public_ip_address = true
 }
-resource "aws_instance" "windows_mgmt_instance" {
-  ami                         = var.windows_ami
-  associate_public_ip_address = true
-  instance_type               = "t3.large"
-  vpc_security_group_ids      = [aws_security_group.cbs_mgmt.id, aws_security_group.bastion.id]
-  subnet_id                   = aws_subnet.public.id
-  key_name                    = var.aws_key_name
-  tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-win-mgmt-vm")
-  }
-}
 
-resource "cbs_array_aws" "cbs_aws" {
+# resource "cbs_array_aws" "cbs_aws" {
 
-  array_name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
+#   array_name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
 
-  deployment_template_url = var.template_url
-  deployment_role_arn     = aws_iam_role.cbs_role.arn
+#   deployment_template_url = var.template_url
+#   deployment_role_arn     = aws_iam_role.cbs_role.arn
 
-  log_sender_domain = var.log_sender_domain
-  alert_recipients  = var.alert_recipients
-  array_model       = var.purity_instance_type
-  license_key       = var.license_key
+#   log_sender_domain = var.log_sender_domain
+#   alert_recipients  = var.alert_recipients
+#   array_model       = var.purity_instance_type
+#   license_key       = var.license_key
 
-  pureuser_key_pair_name = var.aws_key_name
+#   pureuser_key_pair_name = var.bilh_aws_demo_master_key_name
 
-  system_subnet      = aws_subnet.sys.id
-  replication_subnet = aws_subnet.repl.id
-  iscsi_subnet       = aws_subnet.iscsi.id
-  management_subnet  = aws_subnet.mgmt.id
+#   system_subnet      = aws_subnet.sys.id
+#   replication_subnet = aws_subnet.repl.id
+#   iscsi_subnet       = aws_subnet.iscsi.id
+#   management_subnet  = aws_subnet.mgmt.id
 
-  replication_security_group = aws_security_group.cbs_repl.id
-  iscsi_security_group       = aws_security_group.cbs_iscsi.id
-  management_security_group  = aws_security_group.cbs_mgmt.id
-  depends_on = [
-    aws_internet_gateway.cbs_internet_gateway,
-    aws_nat_gateway.cbs_nat_gateway,
-    aws_iam_role.cbs_role,
-    aws_iam_role_policy.cbs_role_policy,
-    aws_security_group.cbs_iscsi,
-    aws_security_group.cbs_mgmt,
-    aws_security_group.cbs_repl,
-    aws_subnet.iscsi,
-    aws_subnet.mgmt,
-    aws_subnet.repl,
-    aws_subnet.sys,
-    aws_vpc.cbs_vpc,
-    aws_route_table_association.public,
-    aws_route_table_association.sys,
-    aws_route_table_association.mgmt,
-    aws_vpc_endpoint.s3,
-    aws_vpc_endpoint.dynamodb,
-    aws_route_table.cbs_routetable,
-    aws_eip.cbs_nat_gateway_eip
-  ]
-}
+#   replication_security_group = aws_security_group.cbs_repl.id
+#   iscsi_security_group       = aws_security_group.cbs_iscsi.id
+#   management_security_group  = aws_security_group.cbs_mgmt.id
+#   depends_on = [
+#     aws_internet_gateway.cbs_internet_gateway,
+#     aws_nat_gateway.cbs_nat_gateway,
+#     aws_iam_role.cbs_role,
+#     aws_iam_role_policy.cbs_role_policy,
+#     aws_security_group.cbs_iscsi,
+#     aws_security_group.cbs_mgmt,
+#     aws_security_group.cbs_repl,
+#     aws_subnet.iscsi,
+#     aws_subnet.mgmt,
+#     aws_subnet.repl,
+#     aws_subnet.sys,
+#     aws_vpc.cbs_vpc,
+#     aws_route_table_association.public,
+#     aws_route_table_association.sys,
+#     aws_route_table_association.mgmt,
+#     aws_vpc_endpoint.s3,
+#     aws_vpc_endpoint.dynamodb,
+#     aws_route_table.cbs_routetable,
+#     aws_eip.cbs_nat_gateway_eip
+#   ]
+# }

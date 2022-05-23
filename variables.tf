@@ -1,38 +1,23 @@
-variable "aws_instance_type" {
+variable "aws_bastion_instance_type" {
   type = string
 }
-variable "aws_key_name" {
+variable "bilh_aws_demo_master_key_name" {
   type = string
 }
-variable "aws_public_key" {
+variable "bilh_aws_demo_master_key_pub" {
   type      = string
   sensitive = true
 }
-variable "aws_rubrik_public_key" {
-  type      = string
-  sensitive = true
-}
-variable "create_cbs_array" {
-  type    = bool
-  default = true
-}
-variable "profile" {
+variable "aws_profile" {
   type        = string
   description = "AWS profile."
-}
-variable "polaris_credentials" {
-  type        = string
-  description = "Account name or path to the Polaris service account file."
 }
 variable "windows_ami" {
   default = "ami-033594f8862b03bb2"
 }
-variable "cbs_mgmt_key" {
+variable "bilh_aws_demo_master_key" {
   type      = string
   sensitive = false
-}
-variable "aws_user_data" {
-  type = string
 }
 variable "aws_region" {
   type = string

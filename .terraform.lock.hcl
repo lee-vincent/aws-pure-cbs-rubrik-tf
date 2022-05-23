@@ -78,25 +78,3 @@ provider "registry.terraform.io/purestorage-openconnect/cbs" {
     "zh:d92c9e7bfec82fb6d66c02584579ceaa22c22b7e1505bfc969b5ebe5d906c015",
   ]
 }
-
-provider "registry.terraform.io/rubrikinc/polaris" {
-  version     = "0.3.12"
-  constraints = "0.3.12"
-  hashes = [
-    "h1:plKfHn1PeSEaccKfx6BvxWZGORpYOCCyj8Evy2Uy/wE=",
-    "zh:089b558d589740b59faeea7ef7a75bee480775017b5717653055d15adcdd5c20",
-    "zh:157520b9cbcc8cd4c80b5153dbe22a3f66501f6cff4b633c03749afb42a921fe",
-    "zh:1f3cc7285e850fde3b1752b5a5ce6642204f5e1e6772dc21673d908e03d2b034",
-    "zh:3263931f06271ad084f2d483024799010c2406c166918270997b58c53fff5598",
-    "zh:3e9fa67b584a6d08eeab03ccdbd7593c97e0525b6a7e2b547faff83f28a5ff6b",
-    "zh:40498b6b027d5cbfbe6f5944ac838145b3afa3580f8303463e6bd1c48f2c230a",
-    "zh:49c67d942a836044d51e7ead59daa3e2f03eb6dcfb0d323d2490ef9efe7ef81a",
-    "zh:580a17f9e4d57986b1711bb6306ff16568243f6687ccb171ecdc94c5c775ed59",
-    "zh:5fb60e2d333a536eb73df19ead7e0cb87c849e15a790132824486bdf903357b5",
-    "zh:657ed844084091cc2df16be65aadee536606c9f8bb2cd3f3c46f1fd4055233aa",
-    "zh:73efb4516b2b9680ac73497c8ce23a95d5ec59583d7f0a72290599c85364c118",
-    "zh:78ab54c09f4a4487f6f3eebd67aa0ded1d84d00863cbe86608368ec798475757",
-    "zh:941fa670571f5f0ae18f2d984f76005bf18896dc0b463f68c4314c2099988f51",
-    "zh:d6c214c081d544fff58e7936c11e89327bde8476eb318164e04f63ba79ddf1de",
-  ]
-}
