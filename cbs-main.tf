@@ -4,11 +4,6 @@
 # purearray factory-reset-token create
 # purearray erase --factory-reset-token <token> --eradicate-all-data
 # after above completes, run terraform destroy
-# need to get private ips of rubrik nodes for bootstrap
-
-
-## delete mgmt sg from bastion
-
 
 # provider "cbs" {
 #   aws {
@@ -20,36 +15,6 @@ provider "aws" {
   profile = var.aws_profile
 }
 
-# Point the provider to the Polaris service account to use.
-# provider "polaris" {
-#   credentials = var.polaris_credentials
-# }
-
-#there was an error with the polaris permission cfn template
-
-# Add the AWS account to Polaris. Access key and secret key are read from
-# ~/.aws/credentials. The default region is read from ~/.aws/config. Polaris
-# will authenticate to AWS using an IAM role setup in a CloudFormation stack.
-# resource "polaris_aws_account" "bilh" {
-#   profile     = var.aws_profile
-#   permissions = "update"
-
-#   cloud_native_protection {
-#     regions = [
-#       var.aws_region
-#     ]
-#   }
-# }
-# provider "rubrik" {
-#   #   node_ip     = "10.255.41.201"
-#   username = ""
-#   password = ""
-# }
-
-# this is all a hack to make sure security groups are
-# created to allow my ip address only, while not
-# exposing my ip to all of github
-# must add ip.txt to .gitignore
 data "local_sensitive_file" "ip" {
   depends_on = [
     null_resource.ip_check,
@@ -73,6 +38,7 @@ module "rubrik-cloud-cluster" {
   aws_subnet_id                            = aws_subnet.rubrik.id
   security_group_id_inbound_ssh_https_mgmt = aws_security_group.bastion.id
   aws_public_key_name                      = var.bilh_aws_demo_master_key_name
+  aws_disable_api_termination              = false
 }
 
 resource "aws_vpc" "cbs_vpc" {
@@ -240,7 +206,6 @@ resource "aws_security_group" "bastion" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
-    self        = true
   }
   ingress {
     description = "all inbound traffic between this sg"
@@ -250,60 +215,14 @@ resource "aws_security_group" "bastion" {
     self        = true
   }
   egress {
-    description = "all outbound traffic between this sg"
+    description = "all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    self        = true
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# resource "aws_security_group_rule" "allow_ssh_bastion" {
-#   type              = "ingress"
-#   description       = "ssh"
-#   from_port         = 22
-#   to_port           = 22
-#   protocol          = "tcp"
-#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
-#   self = true
-#   cidr_blocks       = ["${data.local_sensitive_file.ip.content}"]
-# }
-# resource "aws_security_group_rule" "allow_bastion_to_workload" {
-#   type                     = "ingress"
-#   description              = "all"
-#   from_port                = 0
-#   to_port                  = 0
-#   protocol                 = "-1"
-#   security_group_id        = aws_security_group.bastion.id // Which group to attach it to
-#   source_security_group_id = aws_security_group.bastion.id // Which group to specify as source
-# }
-# resource "aws_security_group_rule" "allow_outbound_bastion_to_workload" {
-#   type              = "egress"
-#   description       = "all"
-#   from_port         = 0
-#   to_port           = 0
-#   protocol          = "-1"
-#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
-#   cidr_blocks       = ["0.0.0.0/0"]
-# }
-# resource "aws_security_group_rule" "allow_443_ping_bastion" {
-#   type              = "ingress"
-#   description       = "443"
-#   from_port         = 443
-#   to_port           = 443
-#   protocol          = "tcp"
-#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
-#   cidr_blocks       = ["0.0.0.0/0"]
-# }
-# resource "aws_security_group_rule" "allow_inbound_ping_bastion" {
-#   type              = "ingress"
-#   description       = "ping"
-#   from_port         = 1
-#   to_port           = 1
-#   protocol          = "icmp"
-#   security_group_id = aws_security_group.bastion.id // Which group to attach it to
-#   cidr_blocks       = ["0.0.0.0/0"]
-# }
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   description = "Management Network Traffic"
@@ -450,8 +369,6 @@ resource "aws_iam_role" "cbs_role" {
 resource "aws_iam_role_policy" "cbs_role_policy" {
   name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs-iamrolepolicy")
   role = aws_iam_role.cbs_role.id
-  # Terraform's "jsonencode" function converts a
-  # Terraform expression result to valid JSON syntax.
   policy = jsonencode({
     "Version" : "2012-10-17",
     "Statement" : [
@@ -623,7 +540,7 @@ resource "aws_instance" "bastion_instance" {
   }
   user_data                   = <<EOF
 #!/bin/bash
-touch /home/ec2-user/.ssh/cbs-mgmt-key
+touch /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chown ec2-user:ec2-user /home/ec2-user/.ssh/bilh_aws_demo_master_key
 echo "${var.bilh_aws_demo_master_key}" > /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chmod 0400 /home/ec2-user/.ssh/bilh_aws_demo_master_key

@@ -8,6 +8,9 @@ output "bastion_instance_public_ip" {
 output "bastion_instance_name" {
   value = aws_instance.bastion_instance.tags["Name"]
 }
+
+# rubrik s3 bucket name
+# rubrik node private ip
 #Outputs for CBS
 # output "cbs_gui_endpoint" {
 #   value = cbs_array_aws.cbs_aws.gui_endpoint
