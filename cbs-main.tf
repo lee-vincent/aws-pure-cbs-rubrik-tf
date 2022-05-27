@@ -5,11 +5,12 @@
 # purearray erase --factory-reset-token <token> --eradicate-all-data
 # after above completes, run terraform destroy
 
-# provider "cbs" {
-#   aws {
-#     region = var.aws_region
-#   }
-# }
+provider "cbs" {
+  aws {
+    region = var.aws_region
+  }
+}
+
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile
@@ -23,9 +24,9 @@ data "local_sensitive_file" "ip" {
 }
 resource "null_resource" "ip_check" {
   # always check for a new workstation ip
-  triggers = {
-    always_run = "${timestamp()}"
-  }
+  # triggers = {
+  #   always_run = "${timestamp()}"
+  # }
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
@@ -524,12 +525,6 @@ data "aws_ami" "amazon_linux2" {
 }
 
 resource "aws_instance" "bastion_instance" {
-  # depends_on = [
-  #   cbs_array_aws.cbs_aws,
-  #   module.rubrik-cloud-cluster
-  #   echo -e "\nexport PURE="${cbs_array_aws.cbs_aws.management_endpoint}"" >> /home/ec2-user/.bashrc
-  # echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
-  # ]
   ami                    = data.aws_ami.amazon_linux2.image_id
   instance_type          = var.aws_bastion_instance_type
   vpc_security_group_ids = [aws_security_group.bastion.id]
@@ -544,52 +539,62 @@ touch /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chown ec2-user:ec2-user /home/ec2-user/.ssh/bilh_aws_demo_master_key
 echo "${var.bilh_aws_demo_master_key}" > /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chmod 0400 /home/ec2-user/.ssh/bilh_aws_demo_master_key
-echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
 EOF
   associate_public_ip_address = true
 }
 
-# resource "cbs_array_aws" "cbs_aws" {
+resource "aws_instance" "win_bastion_instance" {
+  ami                    = var.windows_ami
+  instance_type          = var.aws_bastion_instance_type
+  vpc_security_group_ids = [aws_security_group.bastion.id]
+  subnet_id              = aws_subnet.public.id
+  key_name               = var.bilh_aws_demo_master_key_name
+  tags = {
+    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-winbastion")
+  }
+  associate_public_ip_address = true
+}
 
-#   array_name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
+resource "cbs_array_aws" "cbs_aws" {
 
-#   deployment_template_url = var.template_url
-#   deployment_role_arn     = aws_iam_role.cbs_role.arn
+  array_name              = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
+  deployment_template_url = var.template_url
+  deployment_role_arn     = aws_iam_role.cbs_role.arn
 
-#   log_sender_domain = var.log_sender_domain
-#   alert_recipients  = var.alert_recipients
-#   array_model       = var.purity_instance_type
-#   license_key       = var.license_key
+  log_sender_domain = var.log_sender_domain
+  alert_recipients  = var.alert_recipients
+  array_model       = var.purity_instance_type
+  license_key       = var.license_key
 
-#   pureuser_key_pair_name = var.bilh_aws_demo_master_key_name
+  pureuser_key_pair_name = var.bilh_aws_demo_master_key_name
 
-#   system_subnet      = aws_subnet.sys.id
-#   replication_subnet = aws_subnet.repl.id
-#   iscsi_subnet       = aws_subnet.iscsi.id
-#   management_subnet  = aws_subnet.mgmt.id
+  system_subnet      = aws_subnet.sys.id
+  replication_subnet = aws_subnet.repl.id
+  iscsi_subnet       = aws_subnet.iscsi.id
+  management_subnet  = aws_subnet.mgmt.id
 
-#   replication_security_group = aws_security_group.cbs_repl.id
-#   iscsi_security_group       = aws_security_group.cbs_iscsi.id
-#   management_security_group  = aws_security_group.cbs_mgmt.id
-#   depends_on = [
-#     aws_internet_gateway.cbs_internet_gateway,
-#     aws_nat_gateway.cbs_nat_gateway,
-#     aws_iam_role.cbs_role,
-#     aws_iam_role_policy.cbs_role_policy,
-#     aws_security_group.cbs_iscsi,
-#     aws_security_group.cbs_mgmt,
-#     aws_security_group.cbs_repl,
-#     aws_subnet.iscsi,
-#     aws_subnet.mgmt,
-#     aws_subnet.repl,
-#     aws_subnet.sys,
-#     aws_vpc.cbs_vpc,
-#     aws_route_table_association.public,
-#     aws_route_table_association.sys,
-#     aws_route_table_association.mgmt,
-#     aws_vpc_endpoint.s3,
-#     aws_vpc_endpoint.dynamodb,
-#     aws_route_table.cbs_routetable,
-#     aws_eip.cbs_nat_gateway_eip
-#   ]
-# }
+  replication_security_group = aws_security_group.cbs_repl.id
+  iscsi_security_group       = aws_security_group.cbs_iscsi.id
+  management_security_group  = aws_security_group.cbs_mgmt.id
+  depends_on = [
+    aws_internet_gateway.cbs_internet_gateway,
+    aws_nat_gateway.cbs_nat_gateway,
+    aws_iam_role.cbs_role,
+    aws_iam_role_policy.cbs_role_policy,
+    aws_security_group.cbs_iscsi,
+    aws_security_group.cbs_mgmt,
+    aws_security_group.cbs_repl,
+    aws_subnet.iscsi,
+    aws_subnet.mgmt,
+    aws_subnet.repl,
+    aws_subnet.sys,
+    aws_vpc.cbs_vpc,
+    aws_route_table_association.public,
+    aws_route_table_association.sys,
+    aws_route_table_association.mgmt,
+    aws_vpc_endpoint.s3,
+    aws_vpc_endpoint.dynamodb,
+    aws_route_table.cbs_routetable,
+    aws_eip.cbs_nat_gateway_eip
+  ]
+}
