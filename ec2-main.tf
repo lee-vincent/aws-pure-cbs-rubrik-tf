@@ -1,12 +1,3 @@
-# provider "vault" {
-#   address = "http://localhost:8200"
-#   token   = "<unsealtokenfromvault>"
-# }
-
-# data "vault_generic_secret" "aws_auth" {
-#   path = "secret/<keyname>"
-# }
-
 resource "aws_key_pair" "pure_cbs_key_pair" {
   key_name   = var.bilh_aws_demo_master_key_name
   public_key = var.bilh_aws_demo_master_key_pub

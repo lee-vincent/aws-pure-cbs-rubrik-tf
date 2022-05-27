@@ -11,6 +11,12 @@ output "bastion_instance_name" {
 
 # rubrik s3 bucket name
 # rubrik node private ip
+
+output "rubrik_ips" {
+  value = module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[*]
+}
+
+
 #Outputs for CBS
 # output "cbs_gui_endpoint" {
 #   value = cbs_array_aws.cbs_aws.gui_endpoint

@@ -544,7 +544,7 @@ touch /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chown ec2-user:ec2-user /home/ec2-user/.ssh/bilh_aws_demo_master_key
 echo "${var.bilh_aws_demo_master_key}" > /home/ec2-user/.ssh/bilh_aws_demo_master_key
 chmod 0400 /home/ec2-user/.ssh/bilh_aws_demo_master_key
-
+echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
 EOF
   associate_public_ip_address = true
 }

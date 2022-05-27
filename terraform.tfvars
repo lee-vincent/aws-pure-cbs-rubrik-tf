@@ -17,3 +17,4 @@ alert_recipients     = ["vinnie.lee@ahead.com"]
 purity_instance_type = "V10AR1"
 license_key          = "CBS-TRIAL-LICENSE"
 # bilh_aws_demo_master_key_pub = set in local environment by TF_VAR_bilh_aws_demo_master_key_pub
+# bilh_aws_demo_master_key = set in local environment by TF_VAR_bilh_aws_demo_master_key
