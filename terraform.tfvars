@@ -3,11 +3,12 @@
 # AWS Variables
 aws_prefix  = "tf-cbs-"
 aws_region  = "us-east-1"
-aws_profile = "bilh"
+aws_profile = "ahead-root"
 # If multiple private subnets are used for Cloud Block Store, they must be all in the same Availability zone.
 aws_zone                      = "a"
 aws_bastion_instance_type     = "t3.large"
 bilh_aws_demo_master_key_name = "bilh-aws-demo-master-key"
+aws_windows_key_name          = "aws-windows.pem"
 
 # CBS Variables
 # Purity version 6.25
@@ -22,3 +23,4 @@ license_key          = "CBS-TRIAL-LICENSE"
 ######################################
 # bilh_aws_demo_master_key_pub  = TF_VAR_bilh_aws_demo_master_key_pub
 # bilh_aws_demo_master_key      = TF_VAR_bilh_aws_demo_master_key
+# aws_windows_key_pub           = TF_VAR_aws_windows_key_pub
