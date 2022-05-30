@@ -4,10 +4,6 @@ resource "aws_key_pair" "pure_cbs_key_pair" {
 }
 
 # probably need to create a backup proxy instance to copy the purevol's to
-#commands to set up the pure epic snap scripts
-# purehgroup create --hostlist linux-iscsi-host hg-linux-iscsi-host
-# purepgroup create --hgrouplist hg-linux-iscsi-host pg-linux-iscsi-host
-
 resource "aws_instance" "linux_iscsi_workload" {
   depends_on = [
     cbs_array_aws.cbs_aws,
@@ -97,6 +93,9 @@ resource "aws_instance" "linux_iscsi_workload" {
     ssh -i /home/ec2-user/.ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purehost create linux-iscsi-host --iqnlist $iqn
     ssh -i /home/ec2-user/.ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purevol create epic-iscsi-vol --size 1TB
     ssh -i /home/ec2-user/.ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purevol connect epic-iscsi-vol --host linux-iscsi-host
+    # commands to set up the pure epic snap scripts
+    # purehgroup create --hostlist linux-iscsi-host hg-linux-iscsi-host
+    # purepgroup create --hgrouplist hg-linux-iscsi-host pg-linux-iscsi-host
     iscsiadm -m iface -I iscsi0 -o new
     iscsiadm -m iface -I iscsi1 -o new
     iscsiadm -m iface -I iscsi2 -o new

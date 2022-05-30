@@ -1,10 +1,3 @@
-# create vpc for rubrik cloud? or subnet?
-# to deprovisoin Pure CBS
-# remove deletion protection from cfn
-# purearray factory-reset-token create
-# purearray erase --factory-reset-token <token> --eradicate-all-data
-# after above completes, run terraform destroy
-
 provider "cbs" {
   aws {
     region = var.aws_region
@@ -24,9 +17,9 @@ data "local_sensitive_file" "ip" {
 }
 resource "null_resource" "ip_check" {
   # always check for a new workstation ip
-  # triggers = {
-  #   always_run = "${timestamp()}"
-  # }
+  triggers = {
+    always_run = "${timestamp()}"
+  }
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = "echo -n $(curl https://icanhazip.com --silent)/32 > ip.txt"
@@ -208,6 +201,13 @@ resource "aws_security_group" "bastion" {
     protocol    = "tcp"
     cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
   }
+    ingress {
+    description = "rdp from workstation or this security group"
+    from_port   = 3389
+    to_port     = 3389
+    protocol    = "tcp"
+    cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
+  }
   ingress {
     description = "all inbound traffic between this sg"
     from_port   = 0
@@ -341,14 +341,10 @@ resource "aws_iam_service_linked_role" "autoscaling_dynamodb_role" {
   aws_service_name = "dynamodb.application-autoscaling.amazonaws.com"
 }
 
-# data "aws_iam_policy" "autoscaling_dynamodb_role_policy" {
-#   name = "AWSApplicationAutoscalingDynamoDBTablePolicy"
-# }
-
-# resource "aws_iam_role_policy_attachment" "autoscaling_dynamodb_role_policy_attachment" {
-#   role       = aws_iam_service_linked_role.autoscaling_dynamodb_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSApplicationAutoscalingDynamoDBTablePolicy"
-# }
+resource "aws_iam_role_policy_attachment" "autoscaling_dynamodb_role_policy_attachment" {
+  role       = aws_iam_service_linked_role.autoscaling_dynamodb_role.name
+  policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSApplicationAutoscalingDynamoDBTablePolicy"
+}
 
 resource "aws_iam_role" "cbs_role" {
   name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs-iamrole")
@@ -543,12 +539,17 @@ EOF
   associate_public_ip_address = true
 }
 
+resource "aws_key_pair" "windows_key_pair" {
+  key_name   = var.aws_windows_key_name
+  public_key = var.aws_windows_key_pub
+}
+
 resource "aws_instance" "win_bastion_instance" {
   ami                    = var.windows_ami
   instance_type          = var.aws_bastion_instance_type
   vpc_security_group_ids = [aws_security_group.bastion.id]
   subnet_id              = aws_subnet.public.id
-  key_name               = var.bilh_aws_demo_master_key_name
+  key_name               = var.aws_windows_key_name
   tags = {
     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-winbastion")
   }
@@ -556,6 +557,9 @@ resource "aws_instance" "win_bastion_instance" {
 }
 
 resource "cbs_array_aws" "cbs_aws" {
+  lifecycle {
+    prevent_destroy = var.pure_cbs_prevent_destroy
+  }
 
   array_name              = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
   deployment_template_url = var.template_url
@@ -577,6 +581,7 @@ resource "cbs_array_aws" "cbs_aws" {
   iscsi_security_group       = aws_security_group.cbs_iscsi.id
   management_security_group  = aws_security_group.cbs_mgmt.id
   depends_on = [
+    aws_iam_service_linked_role.autoscaling_dynamodb_role,
     aws_internet_gateway.cbs_internet_gateway,
     aws_nat_gateway.cbs_nat_gateway,
     aws_iam_role.cbs_role,

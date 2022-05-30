@@ -1,12 +1,9 @@
 # Outputs for Pre-Requisites
-output "bastion_instance_private_ip" {
-  value = aws_instance.bastion_instance.private_ip
-}
-output "bastion_instance_public_ip" {
+output "linux_bastion_instance_public_ip" {
   value = aws_instance.bastion_instance.public_ip
 }
-output "bastion_instance_name" {
-  value = aws_instance.bastion_instance.tags["Name"]
+output "windows_bastion_instance_public_ip" {
+  value = aws_instance.win_bastion_instance.public_ip
 }
 
 #Outputs for Rubrik Cloud Cluster
