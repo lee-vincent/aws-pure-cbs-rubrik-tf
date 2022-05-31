@@ -337,14 +337,14 @@ resource "aws_main_route_table_association" "main" {
   route_table_id = aws_route_table.cbs_routetable_main.id
 }
 
-resource "aws_iam_service_linked_role" "autoscaling_dynamodb_role" {
-  aws_service_name = "dynamodb.application-autoscaling.amazonaws.com"
-}
+# resource "aws_iam_service_linked_role" "autoscaling_dynamodb_role" {
+#   aws_service_name = "dynamodb.application-autoscaling.amazonaws.com"
+# }
 
-resource "aws_iam_role_policy_attachment" "autoscaling_dynamodb_role_policy_attachment" {
-  role       = aws_iam_service_linked_role.autoscaling_dynamodb_role.name
-  policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSApplicationAutoscalingDynamoDBTablePolicy"
-}
+# resource "aws_iam_role_policy_attachment" "autoscaling_dynamodb_role_policy_attachment" {
+#   role       = aws_iam_service_linked_role.autoscaling_dynamodb_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSApplicationAutoscalingDynamoDBTablePolicy"
+# }
 
 resource "aws_iam_role" "cbs_role" {
   name = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs-iamrole")
@@ -557,8 +557,17 @@ resource "aws_instance" "win_bastion_instance" {
 }
 
 resource "cbs_array_aws" "cbs_aws" {
+
+# Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
+# To deprovisoin Pure CBS: 
+#  1. remove deletion protection from cloudformation
+#  2. pure cli: purearray factory-reset-token create
+#  3. pure cli: purearray erase --factory-reset-token <token> --eradicate-all-data
+#     wait about 20 minutes for the cloudformation template to delete all resources
+#  4. set prevent_destroy = false
+#  5. run 'terraform destroy'
   lifecycle {
-    prevent_destroy = var.pure_cbs_prevent_destroy
+    prevent_destroy = true
   }
 
   array_name              = format("%s%s%s", var.aws_prefix, var.aws_region, "-cbs")
@@ -581,7 +590,6 @@ resource "cbs_array_aws" "cbs_aws" {
   iscsi_security_group       = aws_security_group.cbs_iscsi.id
   management_security_group  = aws_security_group.cbs_mgmt.id
   depends_on = [
-    aws_iam_service_linked_role.autoscaling_dynamodb_role,
     aws_internet_gateway.cbs_internet_gateway,
     aws_nat_gateway.cbs_nat_gateway,
     aws_iam_role.cbs_role,
