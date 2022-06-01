@@ -195,21 +195,21 @@ resource "aws_security_group" "bastion" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
   }
   ingress {
-    description = "ssh from workstation or this security group"
+    description = "allow ssh from my workstation ip"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
   }
+  # ingress {
+  #   description = "rdp from workstation or this security group"
+  #   from_port   = 3389
+  #   to_port     = 3389
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
+  # }
   ingress {
-    description = "rdp from workstation or this security group"
-    from_port   = 3389
-    to_port     = 3389
-    protocol    = "tcp"
-    cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
-  }
-  ingress {
-    description = "all inbound traffic between this sg"
+    description = "allow all inbound traffic from this security group"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -539,25 +539,36 @@ EOF
   associate_public_ip_address = true
 }
 
-resource "aws_key_pair" "windows_key_pair" {
-  key_name   = var.aws_windows_key_name
-  public_key = var.aws_windows_key_pub
-}
+# resource "aws_key_pair" "windows_key_pair" {
+#   key_name   = var.aws_windows_key_name
+#   public_key = var.aws_windows_key_pub
+# }
 
-resource "aws_instance" "win_bastion_instance" {
-  ami                    = var.windows_ami
-  instance_type          = var.aws_bastion_instance_type
-  vpc_security_group_ids = [aws_security_group.bastion.id]
-  subnet_id              = aws_subnet.public.id
-  key_name               = var.aws_windows_key_name
-  tags = {
-    Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-winbastion")
-  }
-  associate_public_ip_address = true
-}
+# resource "aws_instance" "win_bastion_instance" {
+#   ami                    = var.windows_ami
+#   instance_type          = var.aws_bastion_instance_type
+#   vpc_security_group_ids = [aws_security_group.bastion.id]
+#   subnet_id              = aws_subnet.public.id
+#   key_name               = var.aws_windows_key_name
+#   tags = {
+#     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-winbastion")
+#   }
+#   associate_public_ip_address = true
+# }
 
 resource "cbs_array_aws" "cbs_aws" {
 
+# make a script for removing cbs instance:
+# disconnect host from volume 1?
+# disconnect host from volume 1?
+# delete linux-iscsi-host
+# delete backup-proxy
+# purevol destroy epic-iscsi-vol
+# purevol destroy backup-proxy-iscsi-vol
+# purevol eradicate epic-iscsi-vol
+# purevol eradicate backup-proxy-iscsi-vol
+# TOKEN=$(ssh -i .ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purearray factory-reset-token create | cut -d " " -f 3 | tr -d "[:space:]")
+# purearray erase --factory-reset-token $TOKEN --eradicate-all-data
   # Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
   # To deprovisoin Pure CBS: 
   #  1. remove deletion protection from cloudformation

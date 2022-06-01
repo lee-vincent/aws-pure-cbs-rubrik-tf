@@ -4,6 +4,9 @@ resource "aws_key_pair" "pure_cbs_key_pair" {
 }
 
 # probably need to create a backup proxy instance to copy the purevol's to
+#do i need to chown on the epic-iscsi-vol mount??
+# download a big file to the iscsi volume that we will backup later
+#  wget -O /mnt/epic-iscsi-vol/win22.vhd https://go.microsoft.com/fwlink/p/?linkid=2195166&clcid=0x409&culture=en-us&country=us
 resource "aws_instance" "linux_iscsi_workload" {
   depends_on = [
     cbs_array_aws.cbs_aws,
