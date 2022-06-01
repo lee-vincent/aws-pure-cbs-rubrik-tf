@@ -26,6 +26,9 @@ resource "null_resource" "ip_check" {
   }
 }
 
+# script fileset and snap
+# https://github.com/rubrikinc/rubrik-scripts-for-bash/blob/master/Filesets/create_fileset_and_snapshot.sh
+
 module "rubrik-cloud-cluster" {
   source                                   = "git::https://github.com/lee-vincent/terraform-aws-rubrik-cloud-cluster-es.git"
   aws_region                               = var.aws_region
@@ -136,7 +139,6 @@ resource "aws_nat_gateway" "cbs_nat_gateway" {
   # on the Internet Gateway for the VPC.
   depends_on = [aws_internet_gateway.cbs_internet_gateway]
 }
-
 resource "aws_security_group" "cbs_repl" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-repl-securitygroup")
   description = "Replication Network Traffic"
@@ -186,7 +188,6 @@ resource "aws_security_group" "cbs_iscsi" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-iscsi-securitygroup")
   }
 }
-
 resource "aws_security_group" "bastion" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-bastion-securitygroup")
   description = "Allow inbound SSH from my workstation IP"
@@ -201,13 +202,6 @@ resource "aws_security_group" "bastion" {
     protocol    = "tcp"
     cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
   }
-  # ingress {
-  #   description = "rdp from workstation or this security group"
-  #   from_port   = 3389
-  #   to_port     = 3389
-  #   protocol    = "tcp"
-  #   cidr_blocks = ["${data.local_sensitive_file.ip.content}"]
-  # }
   ingress {
     description = "allow all inbound traffic from this security group"
     from_port   = 0
@@ -223,7 +217,6 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
 resource "aws_security_group" "cbs_mgmt" {
   name        = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-mgmt-securitygroup")
   description = "Management Network Traffic"
@@ -319,7 +312,6 @@ resource "aws_route_table" "cbs_routetable_public" {
     Name = format("%s%s", aws_vpc.cbs_vpc.tags.Name, "-routetable-public")
   }
 }
-
 resource "aws_route_table" "cbs_routetable_main" {
   vpc_id = aws_vpc.cbs_vpc.id
 
@@ -506,7 +498,6 @@ resource "aws_iam_role_policy" "cbs_role_policy" {
     ]
   })
 }
-
 data "aws_ami" "amazon_linux2" {
   owners      = ["amazon"]
   most_recent = true
@@ -519,7 +510,6 @@ data "aws_ami" "amazon_linux2" {
     values = ["x86_64"]
   }
 }
-
 resource "aws_instance" "bastion_instance" {
   ami                    = data.aws_ami.amazon_linux2.image_id
   instance_type          = var.aws_bastion_instance_type
@@ -539,44 +529,27 @@ EOF
   associate_public_ip_address = true
 }
 
-# resource "aws_key_pair" "windows_key_pair" {
-#   key_name   = var.aws_windows_key_name
-#   public_key = var.aws_windows_key_pub
-# }
-
-# resource "aws_instance" "win_bastion_instance" {
-#   ami                    = var.windows_ami
-#   instance_type          = var.aws_bastion_instance_type
-#   vpc_security_group_ids = [aws_security_group.bastion.id]
-#   subnet_id              = aws_subnet.public.id
-#   key_name               = var.aws_windows_key_name
-#   tags = {
-#     Name = format("%s%s%s", var.aws_prefix, var.aws_region, "-winbastion")
-#   }
-#   associate_public_ip_address = true
-# }
-
 resource "cbs_array_aws" "cbs_aws" {
 
-# make a script for removing cbs instance:
-# disconnect host from volume 1?
-# disconnect host from volume 1?
-# delete linux-iscsi-host
-# delete backup-proxy
-# purevol destroy epic-iscsi-vol
-# purevol destroy backup-proxy-iscsi-vol
-# purevol eradicate epic-iscsi-vol
-# purevol eradicate backup-proxy-iscsi-vol
-# TOKEN=$(ssh -i .ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purearray factory-reset-token create | cut -d " " -f 3 | tr -d "[:space:]")
-# purearray erase --factory-reset-token $TOKEN --eradicate-all-data
-  # Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
-  # To deprovisoin Pure CBS: 
-  #  1. remove deletion protection from cloudformation
-  #  2. pure cli: purearray factory-reset-token create
-  #  3. pure cli: purearray erase --factory-reset-token <token> --eradicate-all-data
-  #     wait about 20 minutes for the cloudformation template to delete all resources
-  #  4. set prevent_destroy = false
-  #  5. run 'terraform destroy'
+  # make a script for removing cbs instance:
+  # disconnect host from volume 1?
+  # disconnect host from volume 1?
+  # delete linux-iscsi-host
+  # delete backup-proxy
+  # purevol destroy epic-iscsi-vol
+  # purevol destroy backup-proxy-iscsi-vol
+  # purevol eradicate epic-iscsi-vol
+  # purevol eradicate backup-proxy-iscsi-vol
+  # TOKEN=$(ssh -i .ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purearray factory-reset-token create | cut -d " " -f 3 | tr -d "[:space:]")
+  # purearray erase --factory-reset-token $TOKEN --eradicate-all-data
+    # Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
+    # To deprovisoin Pure CBS: 
+    #  1. remove deletion protection from cloudformation
+    #  2. pure cli: purearray factory-reset-token create
+    #  3. pure cli: purearray erase --factory-reset-token <token> --eradicate-all-data
+    #     wait about 20 minutes for the cloudformation template to delete all resources
+    #  4. set prevent_destroy = false
+    #  5. run 'terraform destroy'
   lifecycle {
     prevent_destroy = true
   }

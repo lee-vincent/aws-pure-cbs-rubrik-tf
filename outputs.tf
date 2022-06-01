@@ -2,9 +2,6 @@
 output "linux_bastion_instance_public_ip" {
   value = aws_instance.bastion_instance.public_ip
 }
-# output "windows_bastion_instance_public_ip" {
-#   value = aws_instance.win_bastion_instance.public_ip
-# }
 
 #Outputs for Rubrik Cloud Cluster
 output "rubrik_ips" {
