@@ -3,7 +3,7 @@
 # AWS Variables
 aws_prefix  = "tf-cbs-"
 aws_region  = "us-east-1"
-aws_profile = "ahead-root"
+aws_profile = "bilh"
 # If multiple private subnets are used for Cloud Block Store, they must be all in the same Availability zone.
 aws_zone                      = "a"
 aws_bastion_instance_type     = "t3.large"

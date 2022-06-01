@@ -34,7 +34,11 @@ output "cbs_iscsi_endpoint_ct1" {
   value = cbs_array_aws.cbs_aws.iscsi_endpoint_ct1
 }
 
-#Outputs for linux workload instance (iscsi initiator)
+# #Outputs for linux workload instance (iscsi initiator)
 output "iscsi_workload_private_ip" {
   value = aws_instance.linux_iscsi_workload.private_ip
+}
+
+output "backup_proxy_private_ip" {
+  value = aws_instance.backup_proxy.private_ip
 }
