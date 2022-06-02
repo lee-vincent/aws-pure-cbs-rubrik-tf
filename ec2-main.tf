@@ -7,6 +7,7 @@ resource "aws_key_pair" "pure_cbs_key_pair" {
 #do i need to chown on the epic-iscsi-vol mount??
 # download a big file to the iscsi volume that we will backup later
 #  wget -O /mnt/epic-iscsi-vol/win22.vhd https://go.microsoft.com/fwlink/p/?linkid=2195166&clcid=0x409&culture=en-us&country=us
+#maybe kick off a background job that creates a new file every 30 seconds
 resource "aws_instance" "linux_iscsi_workload" {
   depends_on = [
     cbs_array_aws.cbs_aws,
@@ -116,6 +117,7 @@ resource "aws_instance" "linux_iscsi_workload" {
     disk=`multipath -ll|awk '{print $1;exit}'`
     mkfs.ext4 /dev/mapper/$disk
     mount /dev/mapper/$disk /mnt/$PURE_VOL_NAME
+    wget -O /mnt/$PURE_VOL_NAME/win22.vhd https://go.microsoft.com/fwlink/p/?linkid=2195166&clcid=0x409&culture=en-us&country=us
   EOF1
 }
 

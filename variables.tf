@@ -8,19 +8,9 @@ variable "bilh_aws_demo_master_key_pub" {
   type      = string
   sensitive = true
 }
-variable "aws_windows_key_name" {
-  type = string
-}
-variable "aws_windows_key_pub" {
-  type      = string
-  sensitive = true
-}
 variable "aws_profile" {
   type        = string
   description = "AWS profile."
-}
-variable "windows_ami" {
-  default = "ami-033594f8862b03bb2"
 }
 variable "bilh_aws_demo_master_key" {
   type      = string
