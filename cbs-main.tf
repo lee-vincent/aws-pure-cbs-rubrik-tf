@@ -542,14 +542,14 @@ resource "cbs_array_aws" "cbs_aws" {
   # purevol eradicate backup-proxy-iscsi-vol
   # TOKEN=$(ssh -i .ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purearray factory-reset-token create | cut -d " " -f 3 | tr -d "[:space:]")
   # purearray erase --factory-reset-token $TOKEN --eradicate-all-data
-    # Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
-    # To deprovisoin Pure CBS: 
-    #  1. remove deletion protection from cloudformation
-    #  2. pure cli: purearray factory-reset-token create
-    #  3. pure cli: purearray erase --factory-reset-token <token> --eradicate-all-data
-    #     wait about 20 minutes for the cloudformation template to delete all resources
-    #  4. set prevent_destroy = false
-    #  5. run 'terraform destroy'
+  # Prevents a successful 'terraform destroy' on Pure Cloud Block Store instances
+  # To deprovisoin Pure CBS: 
+  #  1. remove deletion protection from cloudformation
+  #  2. pure cli: purearray factory-reset-token create
+  #  3. pure cli: purearray erase --factory-reset-token <token> --eradicate-all-data
+  #     wait about 20 minutes for the cloudformation template to delete all resources
+  #  4. set prevent_destroy = false
+  #  5. run 'terraform destroy'
   lifecycle {
     prevent_destroy = true
   }
