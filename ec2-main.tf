@@ -1,13 +1,17 @@
+resource "local_file" "configure_sh" {
+  content  = templatefile("${path.module}/configure.tftpl", { rubrik_ip = "${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}", rubrik_user = "${var.rubrik_user}", rubrik_pass = "${var.rubrik_pass}", rubrik_fileset_name_prefix = "${var.rubrik_fileset_name_prefix}", rubrik_fileset_folder_path = "${var.rubrik_fileset_folder_path}", workload_ip = "${aws_instance.linux_iscsi_workload.private_ip}" })
+  filename = "${path.module}/configure.sh"
+}
 resource "aws_key_pair" "pure_cbs_key_pair" {
   key_name   = var.bilh_aws_demo_master_key_name
   public_key = var.bilh_aws_demo_master_key_pub
 }
 
-# probably need to create a backup proxy instance to copy the purevol's to
-#do i need to chown on the epic-iscsi-vol mount??
-# download a big file to the iscsi volume that we will backup later
-#  wget -O /mnt/epic-iscsi-vol/win22.vhd https://go.microsoft.com/fwlink/p/?linkid=2195166&clcid=0x409&culture=en-us&country=us
-#maybe kick off a background job that creates a new file every 30 seconds
+
+# kick off a background job that creates a new file every 30 seconds
+# read 1KB of random data and store in file.dat
+# dd if=/dev/urandom bs=1 count=1024 > file.dat
+#i can move all the environment variables into tf variables then use them to render the configure.sh template
 resource "aws_instance" "linux_iscsi_workload" {
   depends_on = [
     cbs_array_aws.cbs_aws,
@@ -28,9 +32,9 @@ resource "aws_instance" "linux_iscsi_workload" {
     #!/bin/bash
     export KEYPATH='/home/ec2-user/.ssh/bilh_aws_demo_master_key'
     touch $KEYPATH
-    chown ec2-user:ec2-user $KEYPATH
     echo "${var.bilh_aws_demo_master_key}" > $KEYPATH
     chmod 0400 $KEYPATH
+    chown ec2-user:ec2-user $KEYPATH
 
     echo -e "\nexport PURE="${cbs_array_aws.cbs_aws.management_endpoint}"" >> /home/ec2-user/.bashrc
     echo -e "\nexport RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"" >> /home/ec2-user/.bashrc
@@ -38,14 +42,6 @@ resource "aws_instance" "linux_iscsi_workload" {
     export BACKUP_PROXY="${aws_instance.backup_proxy.private_ip}"
     export PURE="${cbs_array_aws.cbs_aws.management_endpoint}"
     export RUBRIK="${module.rubrik-cloud-cluster.rubrik_cloud_cluster_ip_addrs[0]}"
-
-    touch /home/ec2-user/install-rubrik.sh
-    chown ec2-user:ec2-user /home/ec2-user/install-rubrik.sh
-    echo "mkdir /tmp/rbs" >> /home/ec2-user/install-rubrik.sh
-    echo "cd /tmp/rbs" >> /home/ec2-user/install-rubrik.sh
-    echo "wget --no-check-certificate https://$RUBRIK/connector/rubrik-agent.x86_64.rpm" >> /home/ec2-user/install-rubrik.sh
-    echo "rpm -i rubrik-agent.x86_64.rpm" >> /home/ec2-user/install-rubrik.sh
-    chmod 0744 /home/ec2-user/install-rubrik.sh
 
     yum update -y
     yum -y install iscsi-initiator-utils
@@ -100,6 +96,9 @@ resource "aws_instance" "linux_iscsi_workload" {
     iqn=`awk -F= '{ print $2 }' /etc/iscsi/initiatorname.iscsi`
     PURE_HOST_NAME="linux-iscsi-host"
     PURE_VOL_NAME="epic-iscsi-vol"
+    PURE_MOUNT_PATH="/mnt/$PURE_VOL_NAME"
+    PURE_HOST_GROUP=
+    
     ssh -i $KEYPATH -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purehost create $PURE_HOST_NAME --iqnlist $iqn
     ssh -i $KEYPATH -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purevol create $PURE_VOL_NAME --size 1TB
     ssh -i $KEYPATH -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purevol connect $PURE_VOL_NAME --host $PURE_HOST_NAME
@@ -113,11 +112,12 @@ resource "aws_instance" "linux_iscsi_workload" {
     iscsiadm -m discovery -t st -p "${cbs_array_aws.cbs_aws.iscsi_endpoint_ct0}"
     iscsiadm -m node --login
     iscsiadm -m node -L automatic
-    mkdir /mnt/$PURE_VOL_NAME
+    mkdir $PURE_MOUNT_PATH
     disk=`multipath -ll|awk '{print $1;exit}'`
     mkfs.ext4 /dev/mapper/$disk
-    mount /dev/mapper/$disk /mnt/$PURE_VOL_NAME
+    mount /dev/mapper/$disk $PURE_MOUNT_PATH
     wget -O /mnt/$PURE_VOL_NAME/win22.vhd https://go.microsoft.com/fwlink/p/?linkid=2195166&clcid=0x409&culture=en-us&country=us
+    chown -R ec2-user:ec2-user $PURE_MOUNT_PATH
   EOF1
 }
 

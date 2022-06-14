@@ -13,9 +13,31 @@ variable "aws_profile" {
   description = "AWS profile."
 }
 variable "bilh_aws_demo_master_key" {
-  type      = string
-  sensitive = false
+  type = string
 }
+
+
+variable "rubrik_user" {
+  type    = string
+  default = "admin"
+}
+variable "rubrik_pass" {
+  type = string
+}
+variable "rubrik_fileset_name_prefix" {
+  type    = string
+  default = "EPIC"
+}
+variable "rubrik_fileset_folder_path" {
+  type    = string
+  default = "/mnt/epic-iscsi-vol"
+}
+
+
+
+
+
+
 variable "aws_region" {
   type = string
 }

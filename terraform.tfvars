@@ -22,3 +22,4 @@ license_key          = "CBS-TRIAL-LICENSE"
 ######################################
 # bilh_aws_demo_master_key_pub  = TF_VAR_bilh_aws_demo_master_key_pub
 # bilh_aws_demo_master_key      = TF_VAR_bilh_aws_demo_master_key
+# rubrik_pass                   = TF_VAR_rubrik_pass

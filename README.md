@@ -35,6 +35,8 @@ ssh to a rubrik instance for bootstrap
 run cluster bootstrap while you wait for cbs array to be provisioned
 
 
+write aws cli commands to create the dynamoDB service linked rolelpk
+
 - Type some Markdown on the left
 - See HTML in the right
 - ✨Magic ✨
