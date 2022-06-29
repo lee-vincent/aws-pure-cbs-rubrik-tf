@@ -97,7 +97,7 @@ resource "aws_instance" "linux_iscsi_workload" {
     PURE_HOST_NAME="linux-iscsi-host"
     PURE_VOL_NAME="epic-iscsi-vol"
     PURE_MOUNT_PATH="/mnt/$PURE_VOL_NAME"
-    PURE_HOST_GROUP=
+    # PURE_HOST_GROUP=
     
     ssh -i $KEYPATH -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purehost create $PURE_HOST_NAME --iqnlist $iqn
     ssh -i $KEYPATH -oStrictHostKeyChecking=no pureuser@"${cbs_array_aws.cbs_aws.management_endpoint}" purevol create $PURE_VOL_NAME --size 1TB
