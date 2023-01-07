@@ -1,7 +1,6 @@
-# BILH Terraform Demo
-## Creating, Modifying, and Deleting AWS Infrastructure
-- Author: Vinnie Lee
-- Contact: vinnie.lee@ahead.com
+# Dillinger
+## _The Last Markdown Editor, Ever_
+
 
 [![AHEAD](https://public-bucket-general.s3.amazonaws.com/AHEAD-logo-bluebackground-90x19px.png)](https://ahead.com)
 
