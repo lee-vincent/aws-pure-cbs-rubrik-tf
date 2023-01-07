@@ -7,6 +7,14 @@
 
 This is the description
 
+set TF_VAR for privacy set AWS_ vars for correct account set aws_profile var explain the local ip file use markdown from the eks module to explain the variables in cbs and rubrik ssh-keygen the OPENSSH keys subscribe to pure and rubrik in aws market double check subnet ranges hyperlink to cbs and rubrik docs or put them in the repo?
+
+bootstrap the rubrik cc wait for cbs to provision enable ssh local port forwarding run configure.sh -- scripts that sets up everythign else -- on the bastion instance calls init-rubrik.sh to download RBS on the workload and proxy ssh -i .ssh/bilh_aws_demo_master_key -oStrictHostKeyChecking=no ec2-user@"${aws_instance.linux_iscsi_workload.private_ip}" sudo /home/ec2-user/install-rubrik.sh create rubrik fileset script
+
+ssh to bastion server ssh to a rubrik instance for bootstrap run cluster bootstrap while you wait for cbs array to be provisioned
+
+write aws cli commands to create the dynamoDB service linked rolelpk
+
 - section 1
 - section 2
 - ✨ profit ✨
